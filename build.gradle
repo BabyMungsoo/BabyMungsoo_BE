@@ -42,6 +42,9 @@ dependencies {
     // 임시 H2 DB
     runtimeOnly 'com.h2database:h2'
 
+    // postgresql
+    runtimeOnly 'org.postgresql:postgresql'
+
 }
 
 tasks.named('test') {
