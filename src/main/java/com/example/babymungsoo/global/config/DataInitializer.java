@@ -1,5 +1,6 @@
 package com.example.babymungsoo.global.config;
 
+import com.example.babymungsoo.user.entity.LoginType;
 import com.example.babymungsoo.user.entity.User;
 import com.example.babymungsoo.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +25,7 @@ public class DataInitializer implements CommandLineRunner {
         User devUser = User.builder()
                 .email(DEV_USER_EMAIL)
                 .name(DEV_USER_NAME)
+                .loginType(LoginType.EMAIL)
                 .build();
 
         userRepository.save(devUser);
