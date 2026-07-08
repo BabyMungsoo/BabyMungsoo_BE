@@ -21,7 +21,7 @@ public class TriageResult {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private Long petId;       // ← 이게 있어야 해요!
+    private Long petId;
     private String breed;
     private Integer age;
     private String ageUnit;
