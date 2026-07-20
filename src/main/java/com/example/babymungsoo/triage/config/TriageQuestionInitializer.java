@@ -10,6 +10,7 @@ import java.util.List;
 
 
 @Component
+@org.springframework.context.annotation.Profile({"local", "dev"})
 @RequiredArgsConstructor
 public class TriageQuestionInitializer implements CommandLineRunner {
 
