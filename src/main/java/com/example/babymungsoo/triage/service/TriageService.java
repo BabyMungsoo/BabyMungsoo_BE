@@ -111,8 +111,17 @@ public class TriageService {
     // ----- 내부 헬퍼 -----
 
     private TriageSession findSession(Long sessionId) {
-        return triageSessionRepository.findById(sessionId)
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+
+        TriageSession session = triageSessionRepository.findById(sessionId)
                 .orElseThrow(() -> new CustomException(ErrorCode.TRIAGE_SESSION_NOT_FOUND));
+
+        // Prevent IDOR: do not allow access to sessions owned by other users.
+        if (!Objects.equals(session.getUserId(), currentUserId)) {
+            throw new CustomException(ErrorCode.TRIAGE_SESSION_NOT_FOUND);
+        }
+
+        return session;
     }
 
     private List<Question> findQuestionsByCategory(String symptomCategory) {
