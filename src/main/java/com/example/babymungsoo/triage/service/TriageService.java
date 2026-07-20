@@ -82,6 +82,13 @@ public class TriageService {
         if (request.questionId() != null) {
             question = questionRepository.findById(request.questionId())
                     .orElseThrow(() -> new CustomException(ErrorCode.QUESTION_NOT_FOUND));
+
+            String sessionCategory = session.getSymptomCategory();
+            if (sessionCategory != null && !sessionCategory.isBlank()) {
+                if (!Objects.equals(sessionCategory, question.getSymptomCategory())) {
+                    throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
+                }
+            }
         }
 
         Answer answer = Answer.builder()
