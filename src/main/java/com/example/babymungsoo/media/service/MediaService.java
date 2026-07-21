@@ -16,6 +16,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.imageio.ImageIO;
@@ -48,7 +50,13 @@ public class MediaService {
                 .mediaType(MediaType.IMAGE)
                 .build();
 
-        return mediaFileRepository.save(mediaFile);
+        try {
+            return mediaFileRepository.save(mediaFile);
+        } catch (RuntimeException e) {
+            // DB 저장 실패 시 이미 디스크에 쓰인 파일이 고아로 남지 않도록 보상 삭제
+            storageService.delete(fileUrl);
+            throw e;
+        }
     }
 
     public MediaFile getMedia(Long mediaId) {
@@ -64,12 +72,20 @@ public class MediaService {
     @Transactional
     public void deleteMedia(Long mediaId) {
         MediaFile mediaFile = findOwnedMedia(mediaId);
+        String fileUrl = mediaFile.getFileUrl();
 
         mediaAnalysisRepository.findByMediaFileId(mediaFile.getId())
                 .ifPresent(mediaAnalysisRepository::delete);
-
-        storageService.delete(mediaFile.getFileUrl());
         mediaFileRepository.delete(mediaFile);
+
+        // 디스크 삭제는 되돌릴 수 없으므로, DB 트랜잭션이 커밋되어 메타데이터 삭제가 확정된 뒤에만 수행한다.
+        // (커밋 전에 지우면 DB 롤백 시 파일은 사라졌는데 행은 남는 불일치가 생김)
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                storageService.delete(fileUrl);
+            }
+        });
     }
 
     @Transactional
