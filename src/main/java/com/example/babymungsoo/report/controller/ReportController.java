@@ -4,11 +4,13 @@ import com.example.babymungsoo.report.dto.ReportCreateRequestDto;
 import com.example.babymungsoo.report.dto.ReportResponseDto;
 import com.example.babymungsoo.report.service.ReportService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
-import java.util.stream.Collectors;
+import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/v1/reports")
@@ -21,7 +23,7 @@ public class ReportController {
     // POST /api/v1/reports
     @PostMapping
     public ResponseEntity<ReportResponseDto> createReport(
-            @RequestBody ReportCreateRequestDto requestDto) {
+            @Valid @RequestBody ReportCreateRequestDto requestDto) {
         ReportResponseDto response = ReportResponseDto
                 .from(reportService.createReport(requestDto.toEntity()));
         return ResponseEntity.ok(response);
@@ -47,16 +49,15 @@ public class ReportController {
         return ResponseEntity.ok(response);
     }
 
-    // 병원 ID로 리포트 목록 조회
-    // GET /api/v1/reports/hospital/{hospitalId}
+    // 병원 ID로 리포트 목록 조회 (페이지 단위)
+    // GET /api/v1/reports/hospital/{hospitalId}?page=0&size=10
     @GetMapping("/hospital/{hospitalId}")
-    public ResponseEntity<List<ReportResponseDto>> getReportsByHospitalId(
-            @PathVariable Long hospitalId) {
-        List<ReportResponseDto> reports = reportService
-                .getReportsByHospitalId(hospitalId)
-                .stream()
-                .map(ReportResponseDto::from)
-                .collect(Collectors.toList());
+    public ResponseEntity<Page<ReportResponseDto>> getReportsByHospitalId(
+            @PathVariable Long hospitalId,
+            @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+        Page<ReportResponseDto> reports = reportService
+                .getReportsByHospitalId(hospitalId, pageable)
+                .map(ReportResponseDto::from);
         return ResponseEntity.ok(reports);
     }
 }

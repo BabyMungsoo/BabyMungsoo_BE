@@ -5,7 +5,12 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "analysis_record")
+@Table(
+        name = "analysis_record",
+        indexes = {
+                @Index(name = "idx_analysis_record_user_created", columnList = "userId, createdAt")
+        }
+)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor

@@ -1,5 +1,7 @@
 package com.example.babymungsoo.hospital.service;
 
+import com.example.babymungsoo.global.exception.CustomException;
+import com.example.babymungsoo.global.exception.ErrorCode;
 import com.example.babymungsoo.hospital.entity.Hospital;
 import com.example.babymungsoo.hospital.repository.HospitalRepository;
 import lombok.RequiredArgsConstructor;
@@ -21,10 +23,12 @@ public class HospitalService {
 
     public Hospital getHospitalById(Long hospitalId) {
         return hospitalRepository.findById(hospitalId)
-                .orElseThrow(() -> new IllegalArgumentException("병원을 찾을 수 없습니다. id: " + hospitalId));
+                .orElseThrow(() -> new CustomException(ErrorCode.HOSPITAL_NOT_FOUND));
     }
 
     public List<Hospital> recommendHospitals(Double lat, Double lng, String level) {
+
+        EmergencyLevel emergencyLevel = parseLevel(level);
 
         double range = 0.045;
 
@@ -33,8 +37,7 @@ public class HospitalService {
         double minLng = lng - range;
         double maxLng = lng + range;
 
-
-        if ("IMMEDIATE".equals(level)) {
+        if (emergencyLevel == EmergencyLevel.IMMEDIATE) {
             return hospitalRepository.findAvailableHospitalsByLocation(
                     minLat, maxLat, minLng, maxLng
             );
@@ -43,5 +46,19 @@ public class HospitalService {
         return hospitalRepository.findHospitalsByLocation(
                 minLat, maxLat, minLng, maxLng
         );
+    }
+
+    private EmergencyLevel parseLevel(String level) {
+        try {
+            return EmergencyLevel.valueOf(level);
+        } catch (IllegalArgumentException | NullPointerException e) {
+            throw new CustomException(ErrorCode.INVALID_EMERGENCY_LEVEL);
+        }
+    }
+
+    public enum EmergencyLevel {
+        IMMEDIATE,  // 즉시 응급
+        URGENT,     // 긴급
+        NORMAL      // 일반
     }
 }

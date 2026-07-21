@@ -7,9 +7,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.net.URI;
 import java.util.List;
 import java.util.stream.Collectors;
-
+import jakarta.validation.Valid;
 @RestController
 @RequestMapping("/api/v1/records")
 @RequiredArgsConstructor
@@ -20,10 +21,12 @@ public class AnalysisRecordController {
 
     @PostMapping
     public ResponseEntity<AnalysisRecordResponseDto> createRecord(
-            @RequestBody AnalysisRecordCreateRequestDto requestDto) {
+            @Valid @RequestBody AnalysisRecordCreateRequestDto requestDto) {
         AnalysisRecordResponseDto response = AnalysisRecordResponseDto
                 .from(analysisRecordService.createRecord(requestDto.toEntity()));
-        return ResponseEntity.ok(response);
+
+        URI location = URI.create("/api/v1/records/" + response.getRecordId());
+        return ResponseEntity.created(location).body(response);
     }
 
 
