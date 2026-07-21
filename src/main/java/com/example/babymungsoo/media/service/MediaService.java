@@ -90,7 +90,11 @@ public class MediaService {
 
     @Transactional
     public MediaAnalysis analyze(Long mediaId) {
-        MediaFile mediaFile = findOwnedMedia(mediaId);
+        // MediaFile 행에 쓰기 잠금을 걸어 같은 미디어에 대한 동시 분석 요청을 직렬화한다.
+        // (그렇지 않으면 두 요청이 동시에 MediaAnalysis가 없다고 판단해 각자 생성을 시도하다 유니크 제약 위반으로 실패할 수 있음)
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        MediaFile mediaFile = mediaFileRepository.findWithLockByIdAndUserId(mediaId, currentUserId)
+                .orElseThrow(() -> new CustomException(ErrorCode.MEDIA_NOT_FOUND));
 
         MediaAnalysis mediaAnalysis = mediaAnalysisRepository.findByMediaFileId(mediaFile.getId())
                 .orElseGet(() -> MediaAnalysis.builder()
