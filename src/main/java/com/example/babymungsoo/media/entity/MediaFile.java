@@ -35,10 +35,6 @@ public class MediaFile {
     @Column(nullable = false)
     private Long userId;
 
-    // 업로드 시점에는 분석 요청 전이라 analysis가 없을 수 있음 (media-first 흐름), 분석 완료 후 연결
-    @Column(name = "analysis_id")
-    private Long analysisId;
-
     @Column(nullable = false, length = 500)
     private String fileUrl;
 
@@ -52,8 +48,4 @@ public class MediaFile {
     @CreatedDate
     @Column(updatable = false)
     private LocalDateTime createdAt;
-
-    public void linkAnalysis(Long analysisId) {
-        this.analysisId = analysisId;
-    }
 }
