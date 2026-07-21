@@ -31,6 +31,9 @@ import java.util.Iterator;
 @Transactional(readOnly = true)
 public class MediaService {
 
+    // 40MP: 일반적인 사진 해상도는 넉넉히 허용하면서 압축 해제 폭탄(픽셀 수 대비 파일 크기가 극단적으로 작은 이미지)은 차단
+    private static final long MAX_IMAGE_PIXELS = 40_000_000L;
+
     private final MediaFileRepository mediaFileRepository;
     private final MediaAnalysisRepository mediaAnalysisRepository;
     private final StorageService storageService;
@@ -138,6 +141,15 @@ public class MediaService {
             ImageReader reader = readers.next();
             try {
                 reader.setInput(imageInputStream);
+
+                // 압축 상태(20MB 이하)로는 작아 보여도, 압축 해제 시 가로*세로만큼 래스터 메모리를 통째로 할당하므로
+                // 전체 디코딩(reader.read) 전에 헤더만으로 픽셀 수를 먼저 확인해 압축 폭탄성 이미지를 차단한다.
+                int width = reader.getWidth(0);
+                int height = reader.getHeight(0);
+                if (width <= 0 || height <= 0 || (long) width * height > MAX_IMAGE_PIXELS) {
+                    throw new CustomException(ErrorCode.UNSUPPORTED_MEDIA_TYPE);
+                }
+
                 reader.read(0);
 
                 String[] mimeTypes = reader.getOriginatingProvider().getMIMETypes();
