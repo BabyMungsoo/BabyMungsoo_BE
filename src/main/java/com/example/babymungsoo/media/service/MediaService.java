@@ -103,8 +103,8 @@ public class MediaService {
                         .build());
 
         try {
-            String resultText = mediaAnalyzer.analyze(mediaFile.getFileUrl());
-            mediaAnalysis.complete(resultText);
+            // 실제 분석 결과가 없으면(스텁 등) COMPLETED로 전환하지 않고 PENDING을 유지한다.
+            mediaAnalyzer.analyze(mediaFile.getFileUrl()).ifPresent(mediaAnalysis::complete);
         } catch (RuntimeException e) {
             mediaAnalysis.fail();
         }
