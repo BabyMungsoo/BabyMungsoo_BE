@@ -1,13 +1,16 @@
 package com.example.babymungsoo.media.controller;
 
 import com.example.babymungsoo.global.response.ApiResponse;
+import com.example.babymungsoo.media.MediaFileDownload;
 import com.example.babymungsoo.media.dto.response.MediaAnalysisResponse;
 import com.example.babymungsoo.media.dto.response.MediaResponse;
 import com.example.babymungsoo.media.entity.MediaAnalysis;
 import com.example.babymungsoo.media.entity.MediaFile;
 import com.example.babymungsoo.media.service.MediaService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.Resource;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -34,6 +37,14 @@ public class MediaController {
     public ApiResponse<MediaResponse> getMedia(@PathVariable Long mediaId) {
         MediaFile mediaFile = mediaService.getMedia(mediaId);
         return ApiResponse.success(MediaResponse.from(mediaFile));
+    }
+
+    @GetMapping("/{mediaId}/file")
+    public ResponseEntity<Resource> downloadFile(@PathVariable Long mediaId) {
+        MediaFileDownload download = mediaService.downloadFile(mediaId);
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(download.contentType()))
+                .body(download.resource());
     }
 
     @DeleteMapping("/{mediaId}")

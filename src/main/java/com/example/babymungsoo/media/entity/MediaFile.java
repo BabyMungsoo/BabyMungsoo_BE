@@ -42,6 +42,9 @@ public class MediaFile {
     @Column(nullable = false, length = 500)
     private String fileUrl;
 
+    @Column(nullable = false, length = 100)
+    private String contentType;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 10)
     private MediaType mediaType;

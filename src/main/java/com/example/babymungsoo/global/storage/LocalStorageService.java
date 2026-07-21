@@ -3,11 +3,14 @@ package com.example.babymungsoo.global.storage;
 import com.example.babymungsoo.global.exception.CustomException;
 import com.example.babymungsoo.global.exception.ErrorCode;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.net.MalformedURLException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.UUID;
@@ -53,6 +56,26 @@ public class LocalStorageService implements StorageService {
         try {
             Files.deleteIfExists(uploadDir.resolve(storedFileName));
         } catch (IOException e) {
+            throw new CustomException(ErrorCode.FILE_STORAGE_ERROR);
+        }
+    }
+
+    @Override
+    public Resource load(String fileUrl) {
+        if (!StringUtils.hasText(fileUrl) || !fileUrl.startsWith(URL_PREFIX)) {
+            throw new CustomException(ErrorCode.FILE_STORAGE_ERROR);
+        }
+
+        String storedFileName = fileUrl.substring(URL_PREFIX.length());
+        Path filePath = uploadDir.resolve(storedFileName);
+
+        try {
+            Resource resource = new UrlResource(filePath.toUri());
+            if (!resource.exists() || !resource.isReadable()) {
+                throw new CustomException(ErrorCode.FILE_STORAGE_ERROR);
+            }
+            return resource;
+        } catch (MalformedURLException e) {
             throw new CustomException(ErrorCode.FILE_STORAGE_ERROR);
         }
     }
