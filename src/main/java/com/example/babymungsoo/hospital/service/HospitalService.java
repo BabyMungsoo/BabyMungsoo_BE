@@ -28,6 +28,8 @@ public class HospitalService {
 
     public List<Hospital> recommendHospitals(Double lat, Double lng, String level) {
 
+        validateCoordinate(lat, lng);
+
         EmergencyLevel emergencyLevel = parseLevel(level);
 
         double range = 0.045;
@@ -48,6 +50,16 @@ public class HospitalService {
         );
     }
 
+    private void validateCoordinate(Double lat, Double lng) {
+        if (lat == null || lng == null
+                || lat.isNaN() || lng.isNaN()
+                || lat.isInfinite() || lng.isInfinite()
+                || lat < -90 || lat > 90
+                || lng < -180 || lng > 180) {
+            throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+    }
+
     private EmergencyLevel parseLevel(String level) {
         try {
             return EmergencyLevel.valueOf(level);
@@ -57,8 +69,8 @@ public class HospitalService {
     }
 
     public enum EmergencyLevel {
-        IMMEDIATE,  // 즉시 응급
-        URGENT,     // 긴급
-        NORMAL      // 일반
+        IMMEDIATE,
+        URGENT,
+        NORMAL
     }
 }
