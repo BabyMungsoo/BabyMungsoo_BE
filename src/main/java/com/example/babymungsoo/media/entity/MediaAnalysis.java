@@ -53,5 +53,6 @@ public class MediaAnalysis {
 
     public void fail() {
         this.status = MediaAnalysisStatus.FAILED;
+        this.resultText = null;
     }
 }
