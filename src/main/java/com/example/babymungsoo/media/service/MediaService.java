@@ -16,8 +16,13 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
+
+import javax.imageio.ImageIO;
+import javax.imageio.ImageReader;
+import javax.imageio.stream.ImageInputStream;
+import java.io.IOException;
+import java.util.Iterator;
 
 @Service
 @RequiredArgsConstructor
@@ -32,10 +37,7 @@ public class MediaService {
 
     @Transactional
     public MediaFile upload(MultipartFile file) {
-        String contentType = file.getContentType();
-        if (!StringUtils.hasText(contentType) || !contentType.startsWith("image/")) {
-            throw new CustomException(ErrorCode.UNSUPPORTED_MEDIA_TYPE);
-        }
+        String contentType = detectImageContentType(file);
 
         String fileUrl = storageService.upload(file);
 
@@ -94,5 +96,33 @@ public class MediaService {
         Long currentUserId = currentUserProvider.getCurrentUserId();
         return mediaFileRepository.findByIdAndUserId(mediaId, currentUserId)
                 .orElseThrow(() -> new CustomException(ErrorCode.MEDIA_NOT_FOUND));
+    }
+
+    // 클라이언트가 보낸 Content-Type 헤더는 위조 가능하므로, 실제 픽셀 데이터를 디코딩해 진짜 래스터 이미지인지 검증한다.
+    // ImageIO는 SVG(벡터/XML)를 다루는 기본 리더가 없어 이 과정에서 자연스럽게 함께 거부된다.
+    private String detectImageContentType(MultipartFile file) {
+        try (ImageInputStream imageInputStream = ImageIO.createImageInputStream(file.getInputStream())) {
+            if (imageInputStream == null) {
+                throw new CustomException(ErrorCode.UNSUPPORTED_MEDIA_TYPE);
+            }
+
+            Iterator<ImageReader> readers = ImageIO.getImageReaders(imageInputStream);
+            if (!readers.hasNext()) {
+                throw new CustomException(ErrorCode.UNSUPPORTED_MEDIA_TYPE);
+            }
+
+            ImageReader reader = readers.next();
+            try {
+                reader.setInput(imageInputStream);
+                reader.read(0);
+
+                String[] mimeTypes = reader.getOriginatingProvider().getMIMETypes();
+                return mimeTypes.length > 0 ? mimeTypes[0] : "image/" + reader.getFormatName().toLowerCase();
+            } finally {
+                reader.dispose();
+            }
+        } catch (IOException | RuntimeException e) {
+            throw new CustomException(ErrorCode.UNSUPPORTED_MEDIA_TYPE);
+        }
     }
 }
