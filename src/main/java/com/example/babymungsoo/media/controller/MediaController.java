@@ -7,6 +7,7 @@ import com.example.babymungsoo.media.entity.MediaAnalysis;
 import com.example.babymungsoo.media.entity.MediaFile;
 import com.example.babymungsoo.media.service.MediaService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -23,7 +24,7 @@ public class MediaController {
 
     private final MediaService mediaService;
 
-    @PostMapping("/upload")
+    @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ApiResponse<MediaResponse> upload(@RequestParam("file") MultipartFile file) {
         MediaFile mediaFile = mediaService.upload(file);
         return ApiResponse.success(MediaResponse.from(mediaFile));
