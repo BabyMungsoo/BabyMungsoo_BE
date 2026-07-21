@@ -71,7 +71,11 @@ public class MediaService {
 
     @Transactional
     public void deleteMedia(Long mediaId) {
-        MediaFile mediaFile = findOwnedMedia(mediaId);
+        // analyze()와 동일한 잠금으로 직렬화하지 않으면, 삭제가 분석 행 조회 이후 다른 요청이
+        // 분석을 새로 생성·커밋해도 그 사실을 못 보고 미디어만 지워 분석 행이 고아로 남을 수 있다.
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        MediaFile mediaFile = mediaFileRepository.findWithLockByIdAndUserId(mediaId, currentUserId)
+                .orElseThrow(() -> new CustomException(ErrorCode.MEDIA_NOT_FOUND));
         String fileUrl = mediaFile.getFileUrl();
 
         mediaAnalysisRepository.findByMediaFileId(mediaFile.getId())
