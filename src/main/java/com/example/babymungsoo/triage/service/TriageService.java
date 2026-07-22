@@ -36,6 +36,10 @@ public class TriageService {
 
     @Transactional
     public TriageSessionResponse createSession(TriageSessionCreateRequest request) {
+        if (request.petId() == null) {
+            throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
         Long userId = currentUserProvider.getCurrentUserId();
 
         TriageSession session = TriageSession.builder()
@@ -61,13 +65,19 @@ public class TriageService {
     public QuestionResponse getNextQuestion(Long sessionId) {
         TriageSession session = findSession(sessionId);
 
+        String category = session.getSymptomCategory();
+        if (category == null || category.isBlank()) {
+            // 세션에 증상 카테고리가 없으면 맞춤 질문을 제공하지 않는다(전체 카테고리 혼합 방지).
+            return null;
+        }
+
         Set<Long> answeredQuestionIds = session.getAnswers().stream()
                 .map(Answer::getQuestion)
                 .filter(Objects::nonNull)
                 .map(Question::getId)
                 .collect(Collectors.toSet());
 
-        return findQuestionsByCategory(session.getSymptomCategory()).stream()
+        return questionRepository.findBySymptomCategoryOrderByOrderNoAsc(category).stream()
                 .filter(question -> !answeredQuestionIds.contains(question.getId()))
                 .findFirst()
                 .map(QuestionResponse::from)
@@ -77,6 +87,10 @@ public class TriageService {
     @Transactional
     public AnswerResponse saveAnswer(Long sessionId, AnswerCreateRequest request) {
         TriageSession session = findSession(sessionId);
+
+        if (session.getStatus() == SessionStatus.COMPLETED) {
+            throw new CustomException(ErrorCode.TRIAGE_SESSION_ALREADY_COMPLETED);
+        }
 
         Question question = null;
         if (request.questionId() != null) {

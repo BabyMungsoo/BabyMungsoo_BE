@@ -9,6 +9,7 @@ public enum ErrorCode {
     PET_NOT_FOUND(HttpStatus.NOT_FOUND, "반려동물을 찾을 수 없습니다."),
     TRIAGE_SESSION_NOT_FOUND(HttpStatus.NOT_FOUND, "트리아지 세션을 찾을 수 없습니다."),
     QUESTION_NOT_FOUND(HttpStatus.NOT_FOUND, "질문을 찾을 수 없습니다."),
+    TRIAGE_SESSION_ALREADY_COMPLETED(HttpStatus.CONFLICT, "이미 완료된 세션에는 답변을 추가할 수 없습니다."),
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "인증이 필요합니다."),
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부 오류가 발생했습니다.");
 
