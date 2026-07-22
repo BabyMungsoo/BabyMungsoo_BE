@@ -2,6 +2,7 @@ package com.example.babymungsoo.global.exception;
 
 import com.example.babymungsoo.global.response.ApiResponse;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -27,14 +28,29 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ApiResponse<Void>> handleValidationException(MethodArgumentNotValidException e) {
-        String message = e.getBindingResult().getFieldErrors().stream()
+    public ResponseEntity<ApiResponse<Void>> handleValidationException(
+            MethodArgumentNotValidException e
+    ) {
+        String message = e.getBindingResult()
+                .getFieldErrors()
+                .stream()
                 .findFirst()
                 .map(FieldError::getDefaultMessage)
                 .orElse(ErrorCode.INVALID_INPUT_VALUE.getMessage());
 
         return ResponseEntity
-                .status(ErrorCode.INVALID_INPUT_VALUE.getStatus())
+                .badRequest()
                 .body(ApiResponse.fail(message));
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiResponse<Void>> handleNotReadableException(
+            HttpMessageNotReadableException e
+    ) {
+        return ResponseEntity
+                .badRequest()
+                .body(ApiResponse.fail(
+                        ErrorCode.INVALID_INPUT_VALUE.getMessage()
+                ));
     }
 }

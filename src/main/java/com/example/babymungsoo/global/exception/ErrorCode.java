@@ -15,12 +15,13 @@ public enum ErrorCode {
     UNSUPPORTED_MEDIA_TYPE(HttpStatus.BAD_REQUEST, "현재는 사진 파일만 업로드할 수 있습니다."),
     FILE_STORAGE_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "파일 저장 중 오류가 발생했습니다."),
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부 오류가 발생했습니다."),
-
+    FORBIDDEN(HttpStatus.FORBIDDEN,"접근 권한이 없습니다."),
     HOSPITAL_NOT_FOUND(HttpStatus.NOT_FOUND, "병원을 찾을 수 없습니다."),
     INVALID_EMERGENCY_LEVEL(HttpStatus.BAD_REQUEST, "지원하지 않는 응급 등급입니다."),
     RECORD_NOT_FOUND(HttpStatus.NOT_FOUND, "분석 기록을 찾을 수 없습니다."),
     REPORT_NOT_FOUND(HttpStatus.NOT_FOUND, "리포트를 찾을 수 없습니다."),
     REPORT_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 해당 기록에 대한 리포트가 존재합니다.");
+
 
     private final HttpStatus status;
     private final String message;

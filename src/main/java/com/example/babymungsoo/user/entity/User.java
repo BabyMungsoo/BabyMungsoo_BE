@@ -45,6 +45,10 @@ public class User {
     @Column(name = "login_type", nullable = false, length = 20)
     private LoginType loginType;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "user_role", nullable = false, length = 20)
+    private UserRole role;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
