@@ -92,6 +92,10 @@ public class TriageService {
             throw new CustomException(ErrorCode.TRIAGE_SESSION_ALREADY_COMPLETED);
         }
 
+        if (request.content() == null || request.content().isBlank()) {
+            throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
         Question question = null;
         if (request.questionId() != null) {
             question = questionRepository.findById(request.questionId())
