@@ -1,11 +1,15 @@
 package com.example.babymungsoo.global.config;
 
+import com.example.babymungsoo.user.entity.LoginType;
 import com.example.babymungsoo.user.entity.User;
+import com.example.babymungsoo.user.entity.UserRole;
 import com.example.babymungsoo.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
+@Profile("dev")
 @Component
 @RequiredArgsConstructor
 public class DataInitializer implements CommandLineRunner {
@@ -24,6 +28,8 @@ public class DataInitializer implements CommandLineRunner {
         User devUser = User.builder()
                 .email(DEV_USER_EMAIL)
                 .name(DEV_USER_NAME)
+                .loginType(LoginType.EMAIL)
+                .role(UserRole.ADMIN)
                 .build();
 
         userRepository.save(devUser);

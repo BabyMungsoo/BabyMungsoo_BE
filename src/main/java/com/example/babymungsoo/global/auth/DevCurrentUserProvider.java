@@ -3,8 +3,10 @@ package com.example.babymungsoo.global.auth;
 import com.example.babymungsoo.user.entity.User;
 import com.example.babymungsoo.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
+@Profile("dev")
 @Component
 @RequiredArgsConstructor
 public class DevCurrentUserProvider implements CurrentUserProvider {
