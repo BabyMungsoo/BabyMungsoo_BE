@@ -12,7 +12,3 @@ spring:
   h2:
     console:
       enabled: true
-
-claude:
-  api:
-    key: sk-ant-여기에본인클로드API키입력

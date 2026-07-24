@@ -1,12 +1,18 @@
 package com.example.babymungsoo.triage.service;
 
+import com.example.babymungsoo.AI.Client.ClaudeApiClient;
+import com.example.babymungsoo.AI.Dto.ClaudeTriageResult;
+import com.example.babymungsoo.AI.Entity.TriageResult;
+import com.example.babymungsoo.AI.Repository.TriageResultRepository;
 import com.example.babymungsoo.global.auth.CurrentUserProvider;
 import com.example.babymungsoo.global.exception.CustomException;
 import com.example.babymungsoo.global.exception.ErrorCode;
 import com.example.babymungsoo.triage.dto.request.AnswerCreateRequest;
+import com.example.babymungsoo.triage.dto.request.TriageAnalyzeRequest;
 import com.example.babymungsoo.triage.dto.request.TriageSessionCreateRequest;
 import com.example.babymungsoo.triage.dto.response.AnswerResponse;
 import com.example.babymungsoo.triage.dto.response.QuestionResponse;
+import com.example.babymungsoo.triage.dto.response.TriageAnalyzeResponse;
 import com.example.babymungsoo.triage.dto.response.TriageSessionResponse;
 import com.example.babymungsoo.triage.entity.Answer;
 import com.example.babymungsoo.triage.entity.Question;
@@ -32,7 +38,9 @@ public class TriageService {
     private final TriageSessionRepository triageSessionRepository;
     private final QuestionRepository questionRepository;
     private final AnswerRepository answerRepository;
+    private final TriageResultRepository triageResultRepository;
     private final CurrentUserProvider currentUserProvider;
+    private final ClaudeApiClient claudeApiClient;
 
     @Transactional
     public TriageSessionResponse createSession(TriageSessionCreateRequest request) {
@@ -133,6 +141,45 @@ public class TriageService {
         return TriageSessionResponse.from(findSession(sessionId));
     }
 
+
+    @Transactional
+    public TriageAnalyzeResponse analyze(TriageAnalyzeRequest request) {
+        if (request.sessionId() == null) {
+            throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        TriageSession session = findSession(request.sessionId());
+
+        // 문진이 끝나야 판단 근거가 모두 모이므로, 완료된 세션만 분석한다.
+        if (session.getStatus() != SessionStatus.COMPLETED) {
+            throw new CustomException(ErrorCode.TRIAGE_SESSION_NOT_COMPLETED);
+        }
+
+        String rawSymptoms = buildRawSymptoms(session);
+
+        ClaudeTriageResult analyzed = claudeApiClient.analyze(
+                rawSymptoms,
+                request.breed(),
+                request.age(),
+                request.ageUnit()
+        );
+
+        TriageResult triageResult = TriageResult.builder()
+                .petId(session.getPetId())
+                .breed(request.breed())
+                .age(request.age())
+                .ageUnit(request.ageUnit())
+                .level(analyzed.level())
+                .title(analyzed.title())
+                .reason(analyzed.reason())
+                .guide(analyzed.guide())
+                .rawSymptoms(rawSymptoms)
+                .build();
+
+        TriageResult saved = triageResultRepository.save(triageResult);
+        return TriageAnalyzeResponse.from(saved);
+    }
+
     // ----- 내부 헬퍼 -----
 
     private TriageSession findSession(Long sessionId) {
@@ -147,6 +194,34 @@ public class TriageService {
         }
 
         return session;
+    }
+
+    private String buildRawSymptoms(TriageSession session) {
+        StringBuilder rawSymptoms = new StringBuilder();
+
+        String initialSymptom = session.getInitialSymptom();
+        if (initialSymptom != null && !initialSymptom.isBlank()) {
+            rawSymptoms.append("초기 증상: ").append(initialSymptom).append("\n");
+        }
+
+        String symptomCategory = session.getSymptomCategory();
+        if (symptomCategory != null && !symptomCategory.isBlank()) {
+            rawSymptoms.append("증상 분류: ").append(symptomCategory).append("\n");
+        }
+
+        for (Answer answer : session.getAnswers()) {
+            Question question = answer.getQuestion();
+            // 질문 없이 저장된 자유 서술 답변도 분석 근거에서 누락하지 않는다.
+            String questionContent = (question != null) ? question.getContent() : "추가 설명";
+
+            rawSymptoms.append("- ")
+                    .append(questionContent)
+                    .append(": ")
+                    .append(answer.getContent())
+                    .append("\n");
+        }
+
+        return rawSymptoms.toString();
     }
 
     private List<Question> findQuestionsByCategory(String symptomCategory) {
