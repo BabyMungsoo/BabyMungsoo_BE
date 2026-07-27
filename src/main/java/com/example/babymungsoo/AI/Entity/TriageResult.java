@@ -29,13 +29,15 @@ public class TriageResult {
     @Enumerated(EnumType.STRING)
     private TriageLevel level;
 
+    @Column(columnDefinition = "TEXT")
     private String title;
 
     @ElementCollection
     @CollectionTable(name = "triage_reasons", joinColumns = @JoinColumn(name = "triage_id"))
-    @Column(name = "reason")
+    @Column(name = "reason", columnDefinition = "TEXT")
     private List<String> reason;
 
+    @Column(columnDefinition = "TEXT")
     private String guide;
 
     @Column(columnDefinition = "TEXT")
