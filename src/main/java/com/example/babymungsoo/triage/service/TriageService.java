@@ -7,6 +7,8 @@ import com.example.babymungsoo.AI.Repository.TriageResultRepository;
 import com.example.babymungsoo.global.auth.CurrentUserProvider;
 import com.example.babymungsoo.global.exception.CustomException;
 import com.example.babymungsoo.global.exception.ErrorCode;
+import com.example.babymungsoo.pet.entity.Pet;
+import com.example.babymungsoo.pet.repository.PetRepository;
 import com.example.babymungsoo.triage.dto.request.AnswerCreateRequest;
 import com.example.babymungsoo.triage.dto.request.TriageAnalyzeRequest;
 import com.example.babymungsoo.triage.dto.request.TriageSessionCreateRequest;
@@ -35,10 +37,14 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class TriageService {
 
+    // Pet.age는 단위 없는 정수로 저장되므로 분석 입력에서도 '세'로 해석한다.
+    private static final String AGE_UNIT = "세";
+
     private final TriageSessionRepository triageSessionRepository;
     private final QuestionRepository questionRepository;
     private final AnswerRepository answerRepository;
     private final TriageResultRepository triageResultRepository;
+    private final PetRepository petRepository;
     private final CurrentUserProvider currentUserProvider;
     private final ClaudeApiClient claudeApiClient;
 
@@ -157,18 +163,27 @@ public class TriageService {
 
         String rawSymptoms = buildRawSymptoms(session);
 
+        // 완료 상태여도 초기 증상과 답변이 모두 비어 있으면 판단 근거가 없다.
+        if (rawSymptoms.isBlank()) {
+            throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        // 품종·나이는 클라이언트 입력을 신뢰하지 않고 세션이 가리키는 반려견에서 조회한다.
+        Pet pet = petRepository.findByIdAndUser_Id(session.getPetId(), session.getUserId())
+                .orElseThrow(() -> new CustomException(ErrorCode.PET_NOT_FOUND));
+
         ClaudeTriageResult analyzed = claudeApiClient.analyze(
                 rawSymptoms,
-                request.breed(),
-                request.age(),
-                request.ageUnit()
+                pet.getBreed(),
+                pet.getAge(),
+                AGE_UNIT
         );
 
         TriageResult triageResult = TriageResult.builder()
                 .petId(session.getPetId())
-                .breed(request.breed())
-                .age(request.age())
-                .ageUnit(request.ageUnit())
+                .breed(pet.getBreed())
+                .age(pet.getAge())
+                .ageUnit(AGE_UNIT)
                 .level(analyzed.level())
                 .title(analyzed.title())
                 .reason(analyzed.reason())

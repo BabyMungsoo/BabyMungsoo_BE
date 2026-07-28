@@ -10,6 +10,7 @@ import com.example.babymungsoo.triage.dto.response.TriageSessionResponse;
 import com.example.babymungsoo.triage.service.TriageService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -66,7 +67,7 @@ public class TriageController {
                     + "결과를 저장한 뒤 반환한다. 세션이 COMPLETED 상태가 아니면 분석할 수 없다."
     )
     @PostMapping("/analyze")
-    public TriageAnalyzeResponse analyze(@RequestBody TriageAnalyzeRequest request) {
+    public TriageAnalyzeResponse analyze(@Valid @RequestBody TriageAnalyzeRequest request) {
         return triageService.analyze(request);
     }
 }
