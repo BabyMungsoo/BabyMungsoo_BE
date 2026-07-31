@@ -22,7 +22,13 @@ public interface TriageResultRepository extends JpaRepository<TriageResult, Long
      *
      * <p>신규 저장 경로는 빌더로 넣은 순수 List라 이 문제가 드러나지 않고,
      * DB에서 읽어오는 이 조회에서만 발생한다.
+     *
+     * <p>단건 조회(<code>findBySessionId</code>)가 아니라 최신 1건을 집는 이유는
+     * 기존 데이터에 같은 세션의 결과가 여러 건 있을 수 있기 때문이다.
+     * 멱등 처리 이전에는 분석할 때마다 새 행을 만들었고, {@code sessionId}의 UNIQUE 제약은
+     * 이미 존재하는 테이블에는 {@code ddl-auto: update}로 추가되지 않는다.
+     * 단건 조회였다면 그런 DB에서 재분석이 조회 단계에서 예외로 죽는다.
      */
     @EntityGraph(attributePaths = {"reason"})
-    Optional<TriageResult> findBySessionId(Long sessionId);
+    Optional<TriageResult> findTopBySessionIdOrderByIdDesc(Long sessionId);
 }

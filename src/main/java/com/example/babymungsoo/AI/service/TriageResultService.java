@@ -32,7 +32,7 @@ public class TriageResultService {
      */
     @Transactional(readOnly = true)
     public Optional<TriageAnalyzeResponse> findBySessionId(Long sessionId) {
-        return triageResultRepository.findBySessionId(sessionId)
+        return triageResultRepository.findTopBySessionIdOrderByIdDesc(sessionId)
                 .map(TriageAnalyzeResponse::from);
     }
 

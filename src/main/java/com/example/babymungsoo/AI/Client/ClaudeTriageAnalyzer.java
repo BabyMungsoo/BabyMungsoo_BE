@@ -18,6 +18,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
+import java.io.InterruptedIOException;
 import java.time.Duration;
 
 /**
@@ -77,6 +78,10 @@ public class ClaudeTriageAnalyzer implements TriageAnalyzer {
                 ? AnthropicOkHttpClient.builder()
                         .apiKey(apiKey)
                         .timeout(TIMEOUT)
+                        // timeout은 HTTP 호출 1건당 제한이라 SDK 기본 재시도(2회)와 겹치면
+                        // 전체 대기가 TIMEOUT의 3배까지 늘어난다. 또한 클라이언트가 끊겨도
+                        // 서버는 응답을 생성해 과금했을 수 있어, 재시도는 같은 응답을 다시 사는 셈이다.
+                        .maxRetries(0)
                         .build()
                 : null;
     }
@@ -156,7 +161,14 @@ public class ClaudeTriageAnalyzer implements TriageAnalyzer {
                     .map(StructuredTextBlock::text)
                     .orElseThrow(() -> new CustomException(ErrorCode.AI_RESPONSE_PARSE_ERROR));
         } catch (AnthropicIoException e) {
-            throw new CustomException(ErrorCode.AI_API_TIMEOUT);
+            // AnthropicIoException은 타임아웃뿐 아니라 연결 거부·DNS 실패 등 모든 IO 오류를 감싼다.
+            // 전부 타임아웃으로 보고하면 원인과 메시지가 어긋나므로 원인 예외로 구분한다.
+            // SocketTimeoutException의 부모인 InterruptedIOException으로 잡아
+            // OkHttp의 callTimeout이 던지는 형태까지 함께 처리한다.
+            if (e.getCause() instanceof InterruptedIOException) {
+                throw new CustomException(ErrorCode.AI_API_TIMEOUT);
+            }
+            throw new CustomException(ErrorCode.AI_ANALYSIS_FAILED);
         } catch (AnthropicInvalidDataException e) {
             throw new CustomException(ErrorCode.AI_RESPONSE_PARSE_ERROR);
         } catch (AnthropicServiceException e) {
