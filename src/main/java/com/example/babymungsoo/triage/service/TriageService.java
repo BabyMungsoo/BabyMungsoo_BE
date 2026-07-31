@@ -1,6 +1,6 @@
 package com.example.babymungsoo.triage.service;
 
-import com.example.babymungsoo.AI.Client.ClaudeApiClient;
+import com.example.babymungsoo.AI.Client.TriageAnalyzer;
 import com.example.babymungsoo.AI.Dto.ClaudeTriageResult;
 import com.example.babymungsoo.AI.Entity.TriageResult;
 import com.example.babymungsoo.AI.Repository.TriageResultRepository;
@@ -46,7 +46,7 @@ public class TriageService {
     private final TriageResultRepository triageResultRepository;
     private final PetRepository petRepository;
     private final CurrentUserProvider currentUserProvider;
-    private final ClaudeApiClient claudeApiClient;
+    private final TriageAnalyzer triageAnalyzer;
 
     @Transactional
     public TriageSessionResponse createSession(TriageSessionCreateRequest request) {
@@ -172,7 +172,7 @@ public class TriageService {
         Pet pet = petRepository.findByIdAndUser_Id(session.getPetId(), session.getUserId())
                 .orElseThrow(() -> new CustomException(ErrorCode.PET_NOT_FOUND));
 
-        ClaudeTriageResult analyzed = claudeApiClient.analyze(
+        ClaudeTriageResult analyzed = triageAnalyzer.analyze(
                 rawSymptoms,
                 pet.getBreed(),
                 pet.getAge(),

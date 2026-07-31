@@ -1,26 +1,25 @@
 package com.example.babymungsoo.AI.Client;
 
 import com.example.babymungsoo.AI.Dto.ClaudeTriageResult;
-import com.example.babymungsoo.AI.Entity.TriageLevel;
 import com.example.babymungsoo.global.exception.CustomException;
 import com.example.babymungsoo.global.exception.ErrorCode;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
-
-import java.util.List;
 
 /**
  * Claude API 호출 전담 어댑터.
  *
- * <p>담당 범위는 프롬프트 생성 / 외부 호출 / 결과 반환 / 예외 변환까지다.
- * TriageResult 생성·저장, 세션 조회 등 비즈니스 로직은 {@code TriageService}가 담당한다.
+ * <p>{@code claude.api.mock=false}일 때 등록된다. 기본값은 {@code true}(Mock)이므로
+ * 이 구현체를 쓰려면 {@code CLAUDE_API_MOCK=false}를 명시해야 한다.
  *
- * <p><b>현재는 실제 API를 호출하지 않고 Mock 결과를 반환한다.</b>
- * 교체 지점은 {@link #request(String)} 하나이며, 나머지 구조는 최종 형태를 유지한다.
+ * <p><b>아직 실제 호출은 구현되지 않았다.</b> 인터페이스 분리 단계까지만 반영된 상태이며,
+ * 교체 지점은 {@link #request(String)} 하나다.
  */
 @Component
-public class ClaudeApiClient {
+@ConditionalOnProperty(name = "claude.api.mock", havingValue = "false")
+public class ClaudeTriageAnalyzer implements TriageAnalyzer {
 
     private static final String SYSTEM_PROMPT = """
             당신은 반려견 응급 증상을 분류하는 수의 트리아지 보조 시스템입니다.
@@ -41,7 +40,7 @@ public class ClaudeApiClient {
     private final String apiKey;
     private final String model;
 
-    public ClaudeApiClient(
+    public ClaudeTriageAnalyzer(
             @Value("${claude.api.key:}") String apiKey,
             @Value("${claude.api.model}") String model
     ) {
@@ -49,13 +48,7 @@ public class ClaudeApiClient {
         this.model = model;
     }
 
-    /**
-     * 증상 정보를 Claude에 전달해 응급도 분석 결과를 받는다.
-     *
-     * @param rawSymptoms 초기 증상과 문진 답변을 합친 원본 텍스트
-     * @return 응급도 분석 결과
-     * @throws CustomException API 키 미설정, 호출 실패, 타임아웃, 응답 파싱 실패
-     */
+    @Override
     public ClaudeTriageResult analyze(String rawSymptoms, String breed, Integer age, String ageUnit) {
         validateApiKey();
 
@@ -97,23 +90,30 @@ public class ClaudeApiClient {
     /**
      * Claude 호출 지점.
      *
-     * <p>TODO: 아래 Mock 반환을 실제 SDK 호출로 교체한다. 교체 시 형태는 다음과 같다.
+     * <p>TODO: 실제 SDK 호출로 교체한다. 교체 시 형태는 다음과 같다.
      * <pre>
      *   AnthropicClient client = AnthropicOkHttpClient.builder()
      *           .apiKey(apiKey)
      *           .timeout(Duration.ofSeconds(...))   // 클라이언트는 필드로 승격해 재사용
      *           .build();
      *
-     *   StructuredMessageCreateParams&lt;ClaudeTriageResult&gt; params = MessageCreateParams.builder()
+     *   MessageCreateParams.builder()
      *           .model(model)
-     *           .maxTokens(...)
+     *           .maxTokens(2000L)
      *           .system(SYSTEM_PROMPT)
      *           .addUserMessage(userPrompt)
+     *           .thinking(...)                       // 비활성화: 고정 스키마 분류라 불필요 + 비용 1/3
      *           .outputConfig(ClaudeTriageResult.class)   // 구조화 출력: 스키마 자동 도출
      *           .build();
-     *
-     *   client.messages().create(params) 의 text 블록에서 ClaudeTriageResult 를 꺼낸다.
      * </pre>
+     *
+     * <p>주의 — {@code .outputConfig(Class)}(구조화 출력)와
+     * {@code .outputConfig(OutputConfig)}(effort)는 같은 빌더 슬롯이다.
+     * 둘을 함께 쓰는 형태는 컴파일로 확정한다. 병행이 불가하면 구조화 출력을 택한다
+     * (응답 파싱 안정성이 우선이고, thinking 비활성화만으로 비용의 큰 부분은 잡힌다).
+     *
+     * <p>{@code claude-sonnet-5}는 {@code temperature}/{@code top_p}/{@code top_k}/
+     * {@code budget_tokens}를 포함하면 400을 반환하므로 사용하지 않는다.
      *
      * <p>교체와 함께 아래 catch 절을 추가한다.
      * <ul>
@@ -123,23 +123,9 @@ public class ClaudeApiClient {
      * </ul>
      */
     private ClaudeTriageResult request(String userPrompt) {
-        return mockResult();
-    }
-
-    /**
-     * 실제 API 연동 전까지 사용하는 임시 응답.
-     * 서비스 흐름(분석 → 저장 → 반환) 검증용이며, 연동 시 제거한다.
-     */
-    private ClaudeTriageResult mockResult() {
-        return new ClaudeTriageResult(
-                TriageLevel.WATCH,
-                "[MOCK] 경과 관찰이 필요한 상태입니다",
-                List.of(
-                        "[MOCK] 증상이 반복적으로 나타나고 있어 악화 가능성이 있습니다.",
-                        "[MOCK] 의식 저하나 출혈 등 즉시 내원이 필요한 징후는 확인되지 않았습니다."
-                ),
-                "[MOCK] 물과 사료를 소량씩 나누어 주고 12시간 동안 상태를 지켜보세요. "
-                        + "증상이 심해지거나 새로운 증상이 나타나면 즉시 동물병원에 방문하세요."
+        throw new UnsupportedOperationException(
+                "Claude 실연동은 아직 구현되지 않았다. 현재는 CLAUDE_API_MOCK=true(기본값)로 "
+                        + "StubTriageAnalyzer를 사용한다."
         );
     }
 }
