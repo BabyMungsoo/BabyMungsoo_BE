@@ -1,5 +1,15 @@
 package com.example.babymungsoo.AI.Client;
 
+import com.anthropic.client.AnthropicClient;
+import com.anthropic.client.okhttp.AnthropicOkHttpClient;
+import com.anthropic.errors.AnthropicInvalidDataException;
+import com.anthropic.errors.AnthropicIoException;
+import com.anthropic.errors.AnthropicServiceException;
+import com.anthropic.models.messages.MessageCreateParams;
+import com.anthropic.models.messages.StructuredMessage;
+import com.anthropic.models.messages.StructuredMessageCreateParams;
+import com.anthropic.models.messages.StructuredTextBlock;
+import com.anthropic.models.messages.ThinkingConfigDisabled;
 import com.example.babymungsoo.AI.Dto.ClaudeTriageResult;
 import com.example.babymungsoo.global.exception.CustomException;
 import com.example.babymungsoo.global.exception.ErrorCode;
@@ -8,14 +18,16 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
+import java.time.Duration;
+
 /**
  * Claude API 호출 전담 어댑터.
  *
  * <p>{@code claude.api.mock=false}일 때 등록된다. 기본값은 {@code true}(Mock)이므로
  * 이 구현체를 쓰려면 {@code CLAUDE_API_MOCK=false}를 명시해야 한다.
  *
- * <p><b>아직 실제 호출은 구현되지 않았다.</b> 인터페이스 분리 단계까지만 반영된 상태이며,
- * 교체 지점은 {@link #request(String)} 하나다.
+ * <p>담당 범위는 프롬프트 생성 / 외부 호출 / 결과 반환 / 예외 변환까지다.
+ * TriageResult 생성·저장, 세션 조회 등 비즈니스 로직은 {@code TriageService}가 담당한다.
  */
 @Component
 @ConditionalOnProperty(name = "claude.api.mock", havingValue = "false")
@@ -37,8 +49,23 @@ public class ClaudeTriageAnalyzer implements TriageAnalyzer {
             - 근거(reason)는 입력된 증상과 답변에서 직접 확인되는 내용만 사용합니다.
             """;
 
+    // 응답은 제목 + 근거 2~4문장 + 안내 문단으로 길이가 제한적이다. 초과 과금을 막는 상한.
+    private static final long MAX_TOKENS = 2000L;
+
+    // SDK 기본 타임아웃은 10분이라 응급 상황에서 보호자를 지나치게 기다리게 한다.
+    private static final Duration TIMEOUT = Duration.ofSeconds(60);
+
     private final String apiKey;
     private final String model;
+
+    /**
+     * API 키가 없으면 null이다.
+     *
+     * <p>생성자에서 무조건 빌드하면 키 없는 환경에서 빈 생성이 실패해 기동 자체가 막힌다.
+     * 키 미설정은 {@link #validateApiKey()}가 {@code analyze()} 진입 직후 같은 조건으로
+     * 먼저 던지므로, 이 필드가 null인 채로 사용되는 경로는 없다.
+     */
+    private final AnthropicClient client;
 
     public ClaudeTriageAnalyzer(
             @Value("${claude.api.key:}") String apiKey,
@@ -46,6 +73,12 @@ public class ClaudeTriageAnalyzer implements TriageAnalyzer {
     ) {
         this.apiKey = apiKey;
         this.model = model;
+        this.client = StringUtils.hasText(apiKey)
+                ? AnthropicOkHttpClient.builder()
+                        .apiKey(apiKey)
+                        .timeout(TIMEOUT)
+                        .build()
+                : null;
     }
 
     @Override
@@ -90,42 +123,44 @@ public class ClaudeTriageAnalyzer implements TriageAnalyzer {
     /**
      * Claude 호출 지점.
      *
-     * <p>TODO: 실제 SDK 호출로 교체한다. 교체 시 형태는 다음과 같다.
-     * <pre>
-     *   AnthropicClient client = AnthropicOkHttpClient.builder()
-     *           .apiKey(apiKey)
-     *           .timeout(Duration.ofSeconds(...))   // 클라이언트는 필드로 승격해 재사용
-     *           .build();
+     * <p>구조화 출력을 쓰므로 응답 JSON을 직접 파싱하지 않는다.
+     * {@code outputConfig(Class)}가 {@link ClaudeTriageResult}의 Jackson 애노테이션에서
+     * JSON 스키마를 도출하고, 응답도 해당 타입으로 역직렬화되어 돌아온다.
      *
-     *   MessageCreateParams.builder()
-     *           .model(model)
-     *           .maxTokens(2000L)
-     *           .system(SYSTEM_PROMPT)
-     *           .addUserMessage(userPrompt)
-     *           .thinking(...)                       // 비활성화: 고정 스키마 분류라 불필요 + 비용 1/3
-     *           .outputConfig(ClaudeTriageResult.class)   // 구조화 출력: 스키마 자동 도출
-     *           .build();
-     * </pre>
-     *
-     * <p>주의 — {@code .outputConfig(Class)}(구조화 출력)와
-     * {@code .outputConfig(OutputConfig)}(effort)는 같은 빌더 슬롯이다.
-     * 둘을 함께 쓰는 형태는 컴파일로 확정한다. 병행이 불가하면 구조화 출력을 택한다
-     * (응답 파싱 안정성이 우선이고, thinking 비활성화만으로 비용의 큰 부분은 잡힌다).
+     * <p>{@code effort}는 쓰지 않는다. {@code outputConfig(Class)}(스키마 자동 도출)와
+     * {@code outputConfig(OutputConfig)}(effort)가 같은 빌더 슬롯이라 병행할 수 없고,
+     * 스키마를 손으로 쓰면 {@code ClaudeTriageResult}와 이중 관리가 되기 때문이다.
+     * 비용은 thinking 비활성화로 잡는다(호출당 약 1/3).
      *
      * <p>{@code claude-sonnet-5}는 {@code temperature}/{@code top_p}/{@code top_k}/
      * {@code budget_tokens}를 포함하면 400을 반환하므로 사용하지 않는다.
-     *
-     * <p>교체와 함께 아래 catch 절을 추가한다.
-     * <ul>
-     *   <li>{@code AnthropicIoException}      → {@link ErrorCode#AI_API_TIMEOUT}</li>
-     *   <li>{@code AnthropicServiceException} → {@link ErrorCode#AI_ANALYSIS_FAILED}</li>
-     *   <li>응답에 text 블록이 없거나 역직렬화 실패 → {@link ErrorCode#AI_RESPONSE_PARSE_ERROR}</li>
-     * </ul>
      */
     private ClaudeTriageResult request(String userPrompt) {
-        throw new UnsupportedOperationException(
-                "Claude 실연동은 아직 구현되지 않았다. 현재는 CLAUDE_API_MOCK=true(기본값)로 "
-                        + "StubTriageAnalyzer를 사용한다."
-        );
+        StructuredMessageCreateParams<ClaudeTriageResult> params = MessageCreateParams.builder()
+                .model(model)
+                .maxTokens(MAX_TOKENS)
+                .system(SYSTEM_PROMPT)
+                .addUserMessage(userPrompt)
+                // 정해진 스키마에 맞춰 분류하는 작업이라 깊은 추론이 필요 없다.
+                .thinking(ThinkingConfigDisabled.builder().build())
+                .outputConfig(ClaudeTriageResult.class)
+                .build();
+
+        try {
+            StructuredMessage<ClaudeTriageResult> message = client.messages().create(params);
+
+            // 안전 필터에 걸리는 등으로 text 블록이 없을 수 있으므로 빈 응답을 별도로 처리한다.
+            return message.content().stream()
+                    .flatMap(block -> block.text().stream())
+                    .findFirst()
+                    .map(StructuredTextBlock::text)
+                    .orElseThrow(() -> new CustomException(ErrorCode.AI_RESPONSE_PARSE_ERROR));
+        } catch (AnthropicIoException e) {
+            throw new CustomException(ErrorCode.AI_API_TIMEOUT);
+        } catch (AnthropicInvalidDataException e) {
+            throw new CustomException(ErrorCode.AI_RESPONSE_PARSE_ERROR);
+        } catch (AnthropicServiceException e) {
+            throw new CustomException(ErrorCode.AI_ANALYSIS_FAILED);
+        }
     }
 }
