@@ -20,7 +20,13 @@ public enum ErrorCode {
     INVALID_EMERGENCY_LEVEL(HttpStatus.BAD_REQUEST, "지원하지 않는 응급 등급입니다."),
     RECORD_NOT_FOUND(HttpStatus.NOT_FOUND, "분석 기록을 찾을 수 없습니다."),
     REPORT_NOT_FOUND(HttpStatus.NOT_FOUND, "리포트를 찾을 수 없습니다."),
-    REPORT_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 해당 기록에 대한 리포트가 존재합니다.");
+    REPORT_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 해당 기록에 대한 리포트가 존재합니다."),
+
+    TRIAGE_SESSION_NOT_COMPLETED(HttpStatus.CONFLICT, "완료되지 않은 세션은 분석할 수 없습니다."),
+    AI_API_KEY_NOT_CONFIGURED(HttpStatus.INTERNAL_SERVER_ERROR, "AI 분석 설정이 완료되지 않았습니다."),
+    AI_ANALYSIS_FAILED(HttpStatus.BAD_GATEWAY, "AI 분석 요청에 실패했습니다."),
+    AI_API_TIMEOUT(HttpStatus.GATEWAY_TIMEOUT, "AI 분석 응답 시간이 초과되었습니다."),
+    AI_RESPONSE_PARSE_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "AI 응답을 해석할 수 없습니다.");
 
 
     private final HttpStatus status;

@@ -12,8 +12,3 @@ spring:
     properties:
       hibernate:
         format_sql: true
-
-claude:
-  api:
-    model: claude-opus-4-5
-    key: ${CLAUDE_API_KEY}
