@@ -180,6 +180,7 @@ public class TriageService {
         );
 
         TriageResult triageResult = TriageResult.builder()
+                .sessionId(session.getId())
                 .petId(session.getPetId())
                 .breed(pet.getBreed())
                 .age(pet.getAge())
