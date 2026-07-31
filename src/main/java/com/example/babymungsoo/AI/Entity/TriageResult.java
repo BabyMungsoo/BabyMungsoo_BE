@@ -22,7 +22,10 @@ public class TriageResult {
     private Long id;
 
     // 어떤 문진 세션이 만든 결과인지 추적하기 위한 연결.
-    // 세션당 결과 유일성(재분석 정책)은 이슈 #19에서 다룬다.
+    // 세션당 결과는 하나만 존재한다. 완료된 세션은 답변 추가가 차단되어 분석 입력이
+    // 불변이므로, 재분석 요청에는 기존 결과를 그대로 반환한다(멱등).
+    // UNIQUE는 동시 요청이 검사를 동시에 통과했을 때의 최후 방어선이다.
+    @Column(unique = true)
     private Long sessionId;
 
     private Long petId;
