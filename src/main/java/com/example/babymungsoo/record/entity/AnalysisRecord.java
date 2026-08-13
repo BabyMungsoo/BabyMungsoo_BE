@@ -48,4 +48,18 @@ public class AnalysisRecord {
     public void prePersist() {
         this.createdAt = LocalDateTime.now();
     }
+
+    /**
+     * 부분 수정. null 로 들어온 필드는 건드리지 않습니다.
+     * 단 suspectedDisease 는 nullable 컬럼이라, null 로 보내면 값을 지우는 것으로 봅니다.
+     */
+    public void update(String symptomText, String emergencyLevel, String suspectedDisease) {
+        if (symptomText != null && !symptomText.isBlank()) {
+            this.symptomText = symptomText;
+        }
+        if (emergencyLevel != null && !emergencyLevel.isBlank()) {
+            this.emergencyLevel = emergencyLevel;
+        }
+        this.suspectedDisease = suspectedDisease;
+    }
 }
