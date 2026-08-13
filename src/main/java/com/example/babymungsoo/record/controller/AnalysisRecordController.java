@@ -2,6 +2,7 @@ package com.example.babymungsoo.record.controller;
 
 import com.example.babymungsoo.record.dto.AnalysisRecordCreateRequestDto;
 import com.example.babymungsoo.record.dto.AnalysisRecordResponseDto;
+import com.example.babymungsoo.record.dto.AnalysisRecordUpdateRequestDto;
 import com.example.babymungsoo.record.service.AnalysisRecordService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -46,6 +47,16 @@ public class AnalysisRecordController {
             @PathVariable Long recordId) {
         AnalysisRecordResponseDto response = AnalysisRecordResponseDto
                 .from(analysisRecordService.getRecordById(recordId));
+        return ResponseEntity.ok(response);
+    }
+
+
+    @PatchMapping("/{recordId}")
+    public ResponseEntity<AnalysisRecordResponseDto> updateRecord(
+            @PathVariable Long recordId,
+            @RequestBody AnalysisRecordUpdateRequestDto requestDto) {
+        AnalysisRecordResponseDto response = AnalysisRecordResponseDto
+                .from(analysisRecordService.updateRecord(recordId, requestDto));
         return ResponseEntity.ok(response);
     }
 

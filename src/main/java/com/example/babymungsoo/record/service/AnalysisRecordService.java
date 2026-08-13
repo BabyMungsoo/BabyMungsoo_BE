@@ -2,6 +2,7 @@ package com.example.babymungsoo.record.service;
 
 import com.example.babymungsoo.global.exception.CustomException;
 import com.example.babymungsoo.global.exception.ErrorCode;
+import com.example.babymungsoo.record.dto.AnalysisRecordUpdateRequestDto;
 import com.example.babymungsoo.record.entity.AnalysisRecord;
 import com.example.babymungsoo.record.repository.AnalysisRecordRepository;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +30,20 @@ public class AnalysisRecordService {
     public AnalysisRecord getRecordById(Long recordId) {
         return analysisRecordRepository.findById(recordId)
                 .orElseThrow(() -> new CustomException(ErrorCode.RECORD_NOT_FOUND));
+    }
+
+    /** 부분 수정. 더티 체킹으로 반영되므로 별도 save 는 필요 없습니다. */
+    @Transactional
+    public AnalysisRecord updateRecord(Long recordId, AnalysisRecordUpdateRequestDto requestDto) {
+        AnalysisRecord record = analysisRecordRepository.findById(recordId)
+                .orElseThrow(() -> new CustomException(ErrorCode.RECORD_NOT_FOUND));
+
+        record.update(
+                requestDto.getSymptomText(),
+                requestDto.getEmergencyLevel(),
+                requestDto.getSuspectedDisease()
+        );
+        return record;
     }
 
     @Transactional
