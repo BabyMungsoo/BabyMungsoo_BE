@@ -2,6 +2,7 @@ package com.example.babymungsoo.hospital.controller;
 
 import com.example.babymungsoo.global.response.ApiResponse;
 import com.example.babymungsoo.hospital.service.HospitalSeedService;
+import com.example.babymungsoo.hospital.service.HospitalSeedService.NationwideSeedResult;
 import com.example.babymungsoo.hospital.service.HospitalSeedService.SeedResult;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -36,5 +37,17 @@ public class HospitalAdminController {
     ) {
         SeedResult result = hospitalSeedService.seedAround(lat, lng, radius);
         return ApiResponse.success(result, "동물병원 시드가 완료되었습니다.");
+    }
+
+    /**
+     * 전국 주요 도시를 한 번에 시드한다.
+     * 새 DB(배포 환경 등)를 초기 적재할 때 이 엔드포인트 한 번이면 전국 데이터가 채워진다.
+     * 좌표 목록은 서비스 상수로 관리하며, kakaoPlaceId 기준 멱등이라 여러 번 호출해도 안전하다.
+     */
+    @Operation(summary = "전국 동물병원 일괄 시드(카카오 장소검색)")
+    @PostMapping("/seed-nationwide")
+    public ApiResponse<NationwideSeedResult> seedNationwide() {
+        NationwideSeedResult result = hospitalSeedService.seedNationwide();
+        return ApiResponse.success(result, "전국 동물병원 시드가 완료되었습니다.");
     }
 }
