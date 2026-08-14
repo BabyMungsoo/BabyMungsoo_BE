@@ -28,7 +28,15 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-validation'
 
     // Claude API 연동
-    implementation 'com.anthropic:anthropic-java:2.34.0'
+    //
+    // swagger-annotations 를 제외하는 이유:
+    // 이 SDK 는 io.swagger.core.v3:swagger-annotations(2.2.31) 를 끌고 오는데,
+    // springdoc 이 쓰는 swagger-annotations-jakarta(2.2.47) 와 클래스 이름이 완전히 같습니다.
+    // 구버전이 클래스패스에서 이기면 Schema.$dynamicRef() 가 없어서
+    // /api-docs 요청이 NoSuchMethodError 로 500 을 냅니다.
+    implementation('com.anthropic:anthropic-java:2.34.0') {
+        exclude group: 'io.swagger.core.v3', module: 'swagger-annotations'
+    }
 
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
