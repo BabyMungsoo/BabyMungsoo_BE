@@ -10,6 +10,11 @@ claude:
     # 기본값 true로 개발 중 의도치 않은 과금을 막고, 운영은 prod 설정에서 false로 고정한다.
     mock: ${CLAUDE_API_MOCK:true}
 
+kakao:
+  # 카카오 로컬(장소검색) REST API 키. 서버 비밀값이므로 KAKAO_REST_API_KEY 환경변수로 주입한다.
+  # 비어 있으면 시드 호출 시 KAKAO_API_KEY_NOT_CONFIGURED로 감지된다.
+  rest-api-key: ${KAKAO_REST_API_KEY:}
+
 spring:
   config:
     import: optional:file:.env[.properties]

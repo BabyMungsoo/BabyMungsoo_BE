@@ -7,12 +7,16 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface HospitalRepository extends JpaRepository<Hospital, Long> {
 
 
     List<Hospital> findByIs24hourTrue();
+
+    // 시드 재실행 시 멱등 처리를 위한 카카오 장소 ID 조회
+    Optional<Hospital> findByKakaoPlaceId(String kakaoPlaceId);
 
     @Query("SELECT h FROM Hospital h WHERE " +
             "h.latitude BETWEEN :minLat AND :maxLat AND " +
