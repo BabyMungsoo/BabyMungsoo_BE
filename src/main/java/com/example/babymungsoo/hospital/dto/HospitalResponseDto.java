@@ -19,6 +19,8 @@ public class HospitalResponseDto {
     private Boolean is24hour;
     private String openHours;
     private Float rating;
+    private Integer reviewCount;
+    private String imageUrl;
     private LocalDateTime lastUpdated;
 
     public static HospitalResponseDto from(Hospital hospital) {
@@ -32,6 +34,8 @@ public class HospitalResponseDto {
                 .is24hour(hospital.getIs24hour())
                 .openHours(hospital.getOpenHours())
                 .rating(hospital.getRating())
+                .reviewCount(hospital.getReviewCount())
+                .imageUrl(hospital.getImageUrl())
                 .lastUpdated(hospital.getLastUpdated())
                 .build();
     }
