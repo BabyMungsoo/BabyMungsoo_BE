@@ -43,6 +43,12 @@ public class Hospital {
 
     private Float rating;
 
+    // 리뷰 개수. 시안의 "4.8 (256)"에서 (256)에 해당. 데이터 확보 전엔 null.
+    private Integer reviewCount;
+
+    // 병원 대표 썸네일 이미지 URL. 데이터 확보 전엔 null.
+    private String imageUrl;
+
     @Column(nullable = false)
     private LocalDateTime lastUpdated;
 
