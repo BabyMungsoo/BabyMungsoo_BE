@@ -18,6 +18,7 @@ public class AnalysisRecordResponseDto {
     private String emergencyLevel;
     private String suspectedDisease;
     private String aiGuide;
+    private Long mediaId;
     private LocalDateTime createdAt;
 
     public static AnalysisRecordResponseDto from(AnalysisRecord record) {
@@ -30,6 +31,7 @@ public class AnalysisRecordResponseDto {
                 .emergencyLevel(record.getEmergencyLevel())
                 .suspectedDisease(record.getSuspectedDisease())
                 .aiGuide(record.getAiGuide())
+                .mediaId(record.getMediaId())
                 .createdAt(record.getCreatedAt())
                 .build();
     }
