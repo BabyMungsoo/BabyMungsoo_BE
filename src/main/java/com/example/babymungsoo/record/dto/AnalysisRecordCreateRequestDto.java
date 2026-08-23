@@ -30,6 +30,9 @@ public class AnalysisRecordCreateRequestDto {
 
     private String aiGuide;
 
+    /** 분석에 쓴 사진의 media ID. 사진 없이 문진만으로 분석했다면 비워 둡니다. */
+    private Long mediaId;
+
     public AnalysisRecord toEntity() {
         return AnalysisRecord.builder()
                 .userId(userId)
@@ -39,6 +42,7 @@ public class AnalysisRecordCreateRequestDto {
                 .emergencyLevel(emergencyLevel)
                 .suspectedDisease(suspectedDisease)
                 .aiGuide(aiGuide)
+                .mediaId(mediaId)
                 .build();
     }
 }

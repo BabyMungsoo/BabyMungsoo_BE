@@ -41,6 +41,9 @@ public class AnalysisRecord {
     @Column(columnDefinition = "TEXT")
     private String aiGuide;
 
+    /** 분석에 쓴 사진 (media.id). 문진 분석과 사진 업로드가 별개 흐름이라 없을 수 있습니다. */
+    private Long mediaId;
+
     @Column(nullable = false)
     private LocalDateTime createdAt;
 
