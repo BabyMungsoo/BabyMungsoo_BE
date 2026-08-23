@@ -12,6 +12,7 @@ public enum ErrorCode {
     TRIAGE_SESSION_ALREADY_COMPLETED(HttpStatus.CONFLICT, "이미 완료된 세션에는 답변을 추가할 수 없습니다."),
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "인증이 필요합니다."),
     MEDIA_NOT_FOUND(HttpStatus.NOT_FOUND, "미디어를 찾을 수 없습니다."),
+    MEDIA_ALREADY_ATTACHED(HttpStatus.CONFLICT, "이미 다른 문진 세션에 연결된 사진입니다."),
     UNSUPPORTED_MEDIA_TYPE(HttpStatus.BAD_REQUEST, "현재는 사진 파일만 업로드할 수 있습니다."),
     FILE_STORAGE_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "파일 저장 중 오류가 발생했습니다."),
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부 오류가 발생했습니다."),

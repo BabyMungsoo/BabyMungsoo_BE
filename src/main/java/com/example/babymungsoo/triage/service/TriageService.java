@@ -7,6 +7,8 @@ import com.example.babymungsoo.AI.service.TriageResultService;
 import com.example.babymungsoo.global.auth.CurrentUserProvider;
 import com.example.babymungsoo.global.exception.CustomException;
 import com.example.babymungsoo.global.exception.ErrorCode;
+import com.example.babymungsoo.media.entity.MediaFile;
+import com.example.babymungsoo.media.repository.MediaFileRepository;
 import com.example.babymungsoo.pet.entity.Pet;
 import com.example.babymungsoo.pet.repository.PetRepository;
 import com.example.babymungsoo.triage.dto.request.AnswerCreateRequest;
@@ -48,6 +50,7 @@ public class TriageService {
     private final AnswerRepository answerRepository;
     private final TriageResultService triageResultService;
     private final PetRepository petRepository;
+    private final MediaFileRepository mediaFileRepository;
     private final CurrentUserProvider currentUserProvider;
     private final TriageAnalyzer triageAnalyzer;
 
@@ -68,7 +71,8 @@ public class TriageService {
                 .build();
 
         TriageSession saved = triageSessionRepository.save(session);
-        return TriageSessionResponse.from(saved);
+        List<MediaFile> media = attachMedia(saved.getId(), userId, request.mediaIds());
+        return TriageSessionResponse.from(saved, media);
     }
 
 
@@ -142,12 +146,13 @@ public class TriageService {
     public TriageSessionResponse completeSession(Long sessionId) {
         TriageSession session = findSession(sessionId);
         session.complete();
-        return TriageSessionResponse.from(session);
+        return TriageSessionResponse.from(session, mediaFileRepository.findAllBySessionId(sessionId));
     }
 
 
     public TriageSessionResponse getSession(Long sessionId) {
-        return TriageSessionResponse.from(findSession(sessionId));
+        TriageSession session = findSession(sessionId);
+        return TriageSessionResponse.from(session, mediaFileRepository.findAllBySessionId(sessionId));
     }
 
 
@@ -228,6 +233,33 @@ public class TriageService {
     }
 
     // ----- 내부 헬퍼 -----
+
+    /**
+     * 미리 업로드해 둔 사진들을 방금 만든 세션에 연결한다.
+     *
+     * <p>같은 사진이 동시에 다른 세션에도 붙는 걸 막기 위해 잠금 조회하고,
+     * 존재하지 않거나 다른 사용자 소유인 mediaId 는 소유 사실을 노출하지 않도록
+     * 둘 다 MEDIA_NOT_FOUND 로 처리한다(TriageSession 조회와 동일한 정책).
+     */
+    private List<MediaFile> attachMedia(Long sessionId, Long userId, List<Long> mediaIds) {
+        if (mediaIds == null || mediaIds.isEmpty()) {
+            return List.of();
+        }
+
+        List<MediaFile> mediaFiles = mediaFileRepository.findWithLockByIdInAndUserId(mediaIds, userId);
+        if (mediaFiles.size() != mediaIds.size()) {
+            throw new CustomException(ErrorCode.MEDIA_NOT_FOUND);
+        }
+
+        for (MediaFile mediaFile : mediaFiles) {
+            if (mediaFile.getSessionId() != null) {
+                throw new CustomException(ErrorCode.MEDIA_ALREADY_ATTACHED);
+            }
+            mediaFile.assignSession(sessionId);
+        }
+
+        return mediaFiles;
+    }
 
     private TriageSession findSession(Long sessionId) {
         TriageSession session = triageSessionRepository.findById(sessionId)
