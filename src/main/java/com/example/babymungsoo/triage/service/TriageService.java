@@ -246,8 +246,11 @@ public class TriageService {
             return List.of();
         }
 
-        List<MediaFile> mediaFiles = mediaFileRepository.findWithLockByIdInAndUserId(mediaIds, userId);
-        if (mediaFiles.size() != mediaIds.size()) {
+        // 같은 id가 중복으로 와도(예: [4, 4]) 조회 결과는 한 건이라, 중복 제거한 개수와 비교해야
+        // 정상 소유의 미디어를 MEDIA_NOT_FOUND로 잘못 거부하지 않는다.
+        List<Long> distinctMediaIds = mediaIds.stream().distinct().toList();
+        List<MediaFile> mediaFiles = mediaFileRepository.findWithLockByIdInAndUserId(distinctMediaIds, userId);
+        if (mediaFiles.size() != distinctMediaIds.size()) {
             throw new CustomException(ErrorCode.MEDIA_NOT_FOUND);
         }
 
