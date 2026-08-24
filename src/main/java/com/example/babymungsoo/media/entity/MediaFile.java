@@ -45,7 +45,17 @@ public class MediaFile {
     @Column(nullable = false, length = 10)
     private MediaType mediaType;
 
+    /**
+     * 이 사진이 속한 문진 세션. 업로드 시점엔 세션이 아직 없어 null 로 시작하고,
+     * 문진 세션을 생성할 때 함께 연결된다(TriageService#createSession).
+     */
+    private Long sessionId;
+
     @CreatedDate
     @Column(updatable = false)
     private LocalDateTime createdAt;
+
+    public void assignSession(Long sessionId) {
+        this.sessionId = sessionId;
+    }
 }
