@@ -3,6 +3,9 @@ package com.example.babymungsoo.triage.service;
 import com.example.babymungsoo.AI.Client.TriageAnalyzer;
 import com.example.babymungsoo.AI.Dto.ClaudeTriageResult;
 import com.example.babymungsoo.AI.Entity.TriageResult;
+import com.example.babymungsoo.AI.Dto.PetProfile;
+import com.example.babymungsoo.AI.Dto.TriageImage;
+import com.example.babymungsoo.AI.service.TriageImageLoader;
 import com.example.babymungsoo.AI.service.TriageResultService;
 import com.example.babymungsoo.global.auth.CurrentUserProvider;
 import com.example.babymungsoo.global.exception.CustomException;
@@ -45,6 +48,9 @@ public class TriageService {
     // Pet.age는 단위 없는 정수로 저장되므로 분석 입력에서도 '세'로 해석한다.
     private static final String AGE_UNIT = "세";
 
+    // 문진 한 건에 첨부할 수 있는 사진 수. 분석 입력에 넣는 장수와 같은 값이어야 한다.
+    private static final int MAX_MEDIA_PER_SESSION = 5;
+
     private final TriageSessionRepository triageSessionRepository;
     private final QuestionRepository questionRepository;
     private final AnswerRepository answerRepository;
@@ -53,6 +59,7 @@ public class TriageService {
     private final MediaFileRepository mediaFileRepository;
     private final CurrentUserProvider currentUserProvider;
     private final TriageAnalyzer triageAnalyzer;
+    private final TriageImageLoader triageImageLoader;
 
     @Transactional
     public TriageSessionResponse createSession(TriageSessionCreateRequest request) {
@@ -146,13 +153,13 @@ public class TriageService {
     public TriageSessionResponse completeSession(Long sessionId) {
         TriageSession session = findSession(sessionId);
         session.complete();
-        return TriageSessionResponse.from(session, mediaFileRepository.findAllBySessionId(sessionId));
+        return TriageSessionResponse.from(session, mediaFileRepository.findAllBySessionIdOrderByIdAsc(sessionId));
     }
 
 
     public TriageSessionResponse getSession(Long sessionId) {
         TriageSession session = findSession(sessionId);
-        return TriageSessionResponse.from(session, mediaFileRepository.findAllBySessionId(sessionId));
+        return TriageSessionResponse.from(session, mediaFileRepository.findAllBySessionIdOrderByIdAsc(sessionId));
     }
 
 
@@ -195,23 +202,27 @@ public class TriageService {
             throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
         }
 
-        // 품종·나이는 클라이언트 입력을 신뢰하지 않고 세션이 가리키는 반려견에서 조회한다.
+        // 반려견 정보는 클라이언트 입력을 신뢰하지 않고 세션이 가리키는 반려견에서 조회한다.
         Pet pet = petRepository.findByIdAndUser_Id(session.getPetId(), session.getUserId())
                 .orElseThrow(() -> new CustomException(ErrorCode.PET_NOT_FOUND));
 
-        ClaudeTriageResult analyzed = triageAnalyzer.analyze(
-                rawSymptoms,
-                pet.getBreed(),
-                pet.getAge(),
-                AGE_UNIT
-        );
+        PetProfile petProfile = toPetProfile(pet);
+
+        // 사진은 보조 근거라, 읽지 못한 장이 있어도 로더가 그 장만 빼고 진행한다.
+        List<TriageImage> images = triageImageLoader.load(session.getId());
+
+        ClaudeTriageResult analyzed = triageAnalyzer.analyze(rawSymptoms, petProfile, images);
 
         TriageResult triageResult = TriageResult.builder()
                 .sessionId(session.getId())
                 .petId(session.getPetId())
-                .breed(pet.getBreed())
-                .age(pet.getAge())
-                .ageUnit(AGE_UNIT)
+                .breed(petProfile.breed())
+                .age(petProfile.age())
+                .ageUnit(petProfile.ageUnit())
+                .gender(petProfile.gender())
+                .weight(petProfile.weight())
+                .neutered(petProfile.neutered())
+                .underlyingDisease(petProfile.underlyingDisease())
                 .level(analyzed.level())
                 .title(analyzed.title())
                 .reason(analyzed.reason())
@@ -235,6 +246,25 @@ public class TriageService {
     // ----- 내부 헬퍼 -----
 
     /**
+     * 영속 엔티티를 분석 입력용 값 객체로 옮긴다.
+     *
+     * <p>엔티티를 그대로 분석기에 넘기지 않는 이유는 두 가지다. 분석기가 영속 객체를 쥐면
+     * 트랜잭션 밖에서 지연 로딩을 건드릴 위험이 생기고, 분석 시점의 값을 그대로 결과에
+     * 스냅샷으로 남겨야 하는데 엔티티는 이후 수정될 수 있다.
+     */
+    private PetProfile toPetProfile(Pet pet) {
+        return new PetProfile(
+                pet.getBreed(),
+                pet.getAge(),
+                AGE_UNIT,
+                pet.getGender(),
+                pet.getWeight(),
+                pet.isNeutered(),
+                pet.getUnderlyingDisease()
+        );
+    }
+
+    /**
      * 미리 업로드해 둔 사진들을 방금 만든 세션에 연결한다.
      *
      * <p>같은 사진이 동시에 다른 세션에도 붙는 걸 막기 위해 잠금 조회하고,
@@ -249,6 +279,13 @@ public class TriageService {
         // 같은 id가 중복으로 와도(예: [4, 4]) 조회 결과는 한 건이라, 중복 제거한 개수와 비교해야
         // 정상 소유의 미디어를 MEDIA_NOT_FOUND로 잘못 거부하지 않는다.
         List<Long> distinctMediaIds = mediaIds.stream().distinct().toList();
+
+        // 상한을 여기서 막지 않으면 6장 이상이 그대로 저장된 뒤 분석 단계에서 조용히 잘려나가,
+        // 보호자는 올린 사진이 모두 반영된 줄 알게 된다. 저장 시점에 거부해 그 어긋남을 없앤다.
+        if (distinctMediaIds.size() > MAX_MEDIA_PER_SESSION) {
+            throw new CustomException(ErrorCode.TOO_MANY_MEDIA);
+        }
+
         List<MediaFile> mediaFiles = mediaFileRepository.findWithLockByIdInAndUserId(distinctMediaIds, userId);
         if (mediaFiles.size() != distinctMediaIds.size()) {
             throw new CustomException(ErrorCode.MEDIA_NOT_FOUND);

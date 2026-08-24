@@ -25,6 +25,7 @@ import javax.imageio.ImageReader;
 import javax.imageio.stream.ImageInputStream;
 import java.io.IOException;
 import java.util.Iterator;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -34,6 +35,22 @@ public class MediaService {
     // 40MP: 일반적인 사진 해상도는 넉넉히 허용하면서 압축 해제 폭탄(픽셀 수 대비 파일 크기가 극단적으로 작은 이미지)은 차단
     private static final long MAX_IMAGE_PIXELS = 40_000_000L;
 
+    // 업로드한 사진은 AI 분석 입력으로 그대로 넘어간다. ImageIO가 디코딩할 수 있다는 이유만으로
+    // 통과시키면(BMP, TIFF 등) Claude가 받지 못해 분석 단계에서 버려지므로 여기서 먼저 막는다.
+    //
+    // Claude는 WebP도 받지만 여기서는 제외한다. JDK ImageIO에 WebP 리더가 없어
+    // detectImageContentType()의 readers.hasNext() 검사를 통과하지 못하기 때문이다.
+    // 허용 목록에 넣어봐야 UNSUPPORTED_MEDIA_TYPE으로 떨어져 "받는다고 해놓고 거부하는" 상태가 된다.
+    // WebP를 받으려면 imageio-webp 같은 디코더 의존성을 먼저 추가해야 한다.
+    private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
+            "image/jpeg", "image/png", "image/gif"
+    );
+
+    // 장당 크기 상한. Claude 제한은 base64 기준 10MB인데 base64는 원본보다 약 33% 커져
+    // 원본 7.5MB가 경계다. 여유를 두고 7MB로 잡는다.
+    // TriageImageLoader.MAX_IMAGE_BYTES와 같은 값이어야 한다.
+    private static final long MAX_FILE_BYTES = 7L * 1024 * 1024;
+
     private final MediaFileRepository mediaFileRepository;
     private final MediaAnalysisRepository mediaAnalysisRepository;
     private final StorageService storageService;
@@ -42,6 +59,10 @@ public class MediaService {
 
     @Transactional
     public MediaFile upload(MultipartFile file) {
+        if (file.getSize() > MAX_FILE_BYTES) {
+            throw new CustomException(ErrorCode.FILE_TOO_LARGE);
+        }
+
         String contentType = detectImageContentType(file);
 
         String fileUrl = storageService.upload(file);
@@ -153,7 +174,14 @@ public class MediaService {
                 reader.read(0);
 
                 String[] mimeTypes = reader.getOriginatingProvider().getMIMETypes();
-                return mimeTypes.length > 0 ? mimeTypes[0] : "image/" + reader.getFormatName().toLowerCase();
+                String contentType = mimeTypes.length > 0
+                        ? mimeTypes[0]
+                        : "image/" + reader.getFormatName().toLowerCase();
+
+                if (!ALLOWED_CONTENT_TYPES.contains(contentType.toLowerCase())) {
+                    throw new CustomException(ErrorCode.UNSUPPORTED_MEDIA_TYPE);
+                }
+                return contentType;
             } finally {
                 reader.dispose();
             }
