@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Getter;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Getter
 @Builder
@@ -18,7 +19,7 @@ public class AnalysisRecordResponseDto {
     private String emergencyLevel;
     private String suspectedDisease;
     private String aiGuide;
-    private Long mediaId;
+    private List<Long> mediaIds;
     private LocalDateTime createdAt;
 
     public static AnalysisRecordResponseDto from(AnalysisRecord record) {
@@ -31,7 +32,7 @@ public class AnalysisRecordResponseDto {
                 .emergencyLevel(record.getEmergencyLevel())
                 .suspectedDisease(record.getSuspectedDisease())
                 .aiGuide(record.getAiGuide())
-                .mediaId(record.getMediaId())
+                .mediaIds(record.getMediaIds())
                 .createdAt(record.getCreatedAt())
                 .build();
     }
