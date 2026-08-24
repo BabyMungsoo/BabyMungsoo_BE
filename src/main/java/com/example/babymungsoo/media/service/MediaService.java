@@ -25,6 +25,7 @@ import javax.imageio.ImageReader;
 import javax.imageio.stream.ImageInputStream;
 import java.io.IOException;
 import java.util.Iterator;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -34,6 +35,16 @@ public class MediaService {
     // 40MP: 일반적인 사진 해상도는 넉넉히 허용하면서 압축 해제 폭탄(픽셀 수 대비 파일 크기가 극단적으로 작은 이미지)은 차단
     private static final long MAX_IMAGE_PIXELS = 40_000_000L;
 
+    // 업로드한 사진은 AI 분석 입력으로 그대로 넘어간다. Claude가 받는 포맷은 이 넷뿐이라
+    // ImageIO가 디코딩할 수 있다는 이유만으로 통과시키면(BMP, TIFF 등) 분석 단계에서 버려진다.
+    private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
+            "image/jpeg", "image/png", "image/gif", "image/webp"
+    );
+
+    // 장당 크기 상한. Claude 제한은 base64 기준 10MB인데 base64는 원본보다 약 33% 커져
+    // 원본 7.5MB가 경계다. 여유를 두고 7MB로 잡는다.
+    private static final long MAX_FILE_BYTES = 7L * 1024 * 1024;
+
     private final MediaFileRepository mediaFileRepository;
     private final MediaAnalysisRepository mediaAnalysisRepository;
     private final StorageService storageService;
@@ -42,6 +53,10 @@ public class MediaService {
 
     @Transactional
     public MediaFile upload(MultipartFile file) {
+        if (file.getSize() > MAX_FILE_BYTES) {
+            throw new CustomException(ErrorCode.FILE_TOO_LARGE);
+        }
+
         String contentType = detectImageContentType(file);
 
         String fileUrl = storageService.upload(file);
@@ -153,7 +168,14 @@ public class MediaService {
                 reader.read(0);
 
                 String[] mimeTypes = reader.getOriginatingProvider().getMIMETypes();
-                return mimeTypes.length > 0 ? mimeTypes[0] : "image/" + reader.getFormatName().toLowerCase();
+                String contentType = mimeTypes.length > 0
+                        ? mimeTypes[0]
+                        : "image/" + reader.getFormatName().toLowerCase();
+
+                if (!ALLOWED_CONTENT_TYPES.contains(contentType.toLowerCase())) {
+                    throw new CustomException(ErrorCode.UNSUPPORTED_MEDIA_TYPE);
+                }
+                return contentType;
             } finally {
                 reader.dispose();
             }

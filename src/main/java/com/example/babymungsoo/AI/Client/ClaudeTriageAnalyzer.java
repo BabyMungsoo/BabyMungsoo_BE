@@ -5,13 +5,18 @@ import com.anthropic.client.okhttp.AnthropicOkHttpClient;
 import com.anthropic.errors.AnthropicInvalidDataException;
 import com.anthropic.errors.AnthropicIoException;
 import com.anthropic.errors.AnthropicServiceException;
+import com.anthropic.models.messages.Base64ImageSource;
+import com.anthropic.models.messages.ContentBlockParam;
+import com.anthropic.models.messages.ImageBlockParam;
 import com.anthropic.models.messages.MessageCreateParams;
 import com.anthropic.models.messages.StructuredMessage;
+import com.anthropic.models.messages.TextBlockParam;
 import com.anthropic.models.messages.StructuredMessageCreateParams;
 import com.anthropic.models.messages.StructuredTextBlock;
 import com.anthropic.models.messages.ThinkingConfigDisabled;
 import com.example.babymungsoo.AI.Dto.ClaudeTriageResult;
 import com.example.babymungsoo.AI.Dto.PetProfile;
+import com.example.babymungsoo.AI.Dto.TriageImage;
 import com.example.babymungsoo.global.exception.CustomException;
 import com.example.babymungsoo.global.exception.ErrorCode;
 import com.example.babymungsoo.pet.entity.PetGender;
@@ -22,6 +27,8 @@ import org.springframework.util.StringUtils;
 
 import java.io.InterruptedIOException;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Claude API 호출 전담 어댑터.
@@ -53,6 +60,13 @@ public class ClaudeTriageAnalyzer implements TriageAnalyzer {
             - 반려견 정보에 "미입력"으로 표시된 항목은 해당 사항이 없다는 뜻이 아니라
               정보가 제공되지 않았다는 뜻입니다. 없는 것으로 단정하지 말고,
               그 항목을 근거(reason)에 사용하지 않습니다.
+
+            사진이 함께 제공된 경우
+            - 사진은 보조 근거입니다. 사진에서 실제로 확인되는 것만 서술하고,
+              보이지 않는 것을 추측하지 않습니다.
+            - 사진이 흐리거나 판단에 도움이 되지 않으면 근거로 사용하지 않습니다.
+            - 사진을 근거로 쓸 때는 몇 번째 사진에서 무엇이 보였는지 밝힙니다.
+            - 사진만으로 병변을 진단하지 않습니다. 아래 금지 사항이 사진에도 그대로 적용됩니다.
 
             금지 사항
             당신은 수의사가 아니며, 아래는 수의사만 할 수 있는 진료행위입니다.
@@ -116,13 +130,13 @@ public class ClaudeTriageAnalyzer implements TriageAnalyzer {
     }
 
     @Override
-    public ClaudeTriageResult analyze(String rawSymptoms, PetProfile pet) {
+    public ClaudeTriageResult analyze(String rawSymptoms, PetProfile pet, List<TriageImage> images) {
         validateApiKey();
 
-        String userPrompt = buildUserPrompt(rawSymptoms, pet);
+        List<ContentBlockParam> blocks = buildUserBlocks(rawSymptoms, pet, images);
 
         try {
-            return request(userPrompt);
+            return request(blocks);
         } catch (CustomException e) {
             // request() 내부에서 이미 의미 있는 ErrorCode로 변환된 예외는 그대로 전달한다.
             throw e;
@@ -140,7 +154,61 @@ public class ClaudeTriageAnalyzer implements TriageAnalyzer {
     }
 
     /**
-     * 반려견 정보와 증상을 하나의 사용자 프롬프트로 조립한다.
+     * 사용자 메시지를 구성할 블록 목록을 만든다.
+     *
+     * <p>이미지를 텍스트보다 <b>앞에</b> 두는 것이 Anthropic 권장 배치다. 또 각 이미지 앞에
+     * "사진 N:" 라벨을 붙여야 프롬프트와 응답에서 특정 사진을 지칭할 수 있다.
+     *
+     * <p>사진이 없으면 텍스트 블록 하나만 남아 기존 호출과 동일해진다.
+     */
+    private List<ContentBlockParam> buildUserBlocks(String rawSymptoms, PetProfile pet,
+                                                    List<TriageImage> images) {
+        List<ContentBlockParam> blocks = new ArrayList<>();
+
+        if (images != null) {
+            int label = 1;
+            for (TriageImage image : images) {
+                blocks.add(textBlock("사진 " + label++ + ":"));
+                blocks.add(imageBlock(image));
+            }
+        }
+
+        blocks.add(textBlock(buildUserPrompt(rawSymptoms, pet)));
+        return blocks;
+    }
+
+    private ContentBlockParam textBlock(String text) {
+        return ContentBlockParam.ofText(TextBlockParam.builder().text(text).build());
+    }
+
+    private ContentBlockParam imageBlock(TriageImage image) {
+        return ContentBlockParam.ofImage(
+                ImageBlockParam.builder()
+                        .source(Base64ImageSource.builder()
+                                .mediaType(toSourceMediaType(image.contentType()))
+                                .data(image.base64Data())
+                                .build())
+                        .build()
+        );
+    }
+
+    /**
+     * MIME 문자열을 SDK 열거값으로 옮긴다.
+     *
+     * <p>여기 도달하기 전에 {@code TriageImageLoader}가 지원 포맷만 남기므로
+     * default 분기는 방어용이다.
+     */
+    private Base64ImageSource.MediaType toSourceMediaType(String contentType) {
+        return switch (contentType.toLowerCase()) {
+            case "image/png" -> Base64ImageSource.MediaType.IMAGE_PNG;
+            case "image/gif" -> Base64ImageSource.MediaType.IMAGE_GIF;
+            case "image/webp" -> Base64ImageSource.MediaType.IMAGE_WEBP;
+            default -> Base64ImageSource.MediaType.IMAGE_JPEG;
+        };
+    }
+
+    /**
+     * 반려견 정보와 증상을 하나의 텍스트 프롬프트로 조립한다.
      *
      * <p>비어 있는 항목을 "없음"이 아니라 {@link #UNKNOWN}으로 적는 것이 중요하다.
      * {@code weight}와 {@code underlyingDisease}는 nullable이라 "질환이 없어서 비었는지"와
@@ -202,12 +270,12 @@ public class ClaudeTriageAnalyzer implements TriageAnalyzer {
      * <p>{@code claude-sonnet-5}는 {@code temperature}/{@code top_p}/{@code top_k}/
      * {@code budget_tokens}를 포함하면 400을 반환하므로 사용하지 않는다.
      */
-    private ClaudeTriageResult request(String userPrompt) {
+    private ClaudeTriageResult request(List<ContentBlockParam> userBlocks) {
         StructuredMessageCreateParams<ClaudeTriageResult> params = MessageCreateParams.builder()
                 .model(model)
                 .maxTokens(MAX_TOKENS)
                 .system(SYSTEM_PROMPT)
-                .addUserMessage(userPrompt)
+                .addUserMessageOfBlockParams(userBlocks)
                 // 정해진 스키마에 맞춰 분류하는 작업이라 깊은 추론이 필요 없다.
                 .thinking(ThinkingConfigDisabled.builder().build())
                 .outputConfig(ClaudeTriageResult.class)

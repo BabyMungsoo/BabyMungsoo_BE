@@ -4,6 +4,8 @@ import com.example.babymungsoo.AI.Client.TriageAnalyzer;
 import com.example.babymungsoo.AI.Dto.ClaudeTriageResult;
 import com.example.babymungsoo.AI.Entity.TriageResult;
 import com.example.babymungsoo.AI.Dto.PetProfile;
+import com.example.babymungsoo.AI.Dto.TriageImage;
+import com.example.babymungsoo.AI.service.TriageImageLoader;
 import com.example.babymungsoo.AI.service.TriageResultService;
 import com.example.babymungsoo.global.auth.CurrentUserProvider;
 import com.example.babymungsoo.global.exception.CustomException;
@@ -54,6 +56,7 @@ public class TriageService {
     private final MediaFileRepository mediaFileRepository;
     private final CurrentUserProvider currentUserProvider;
     private final TriageAnalyzer triageAnalyzer;
+    private final TriageImageLoader triageImageLoader;
 
     @Transactional
     public TriageSessionResponse createSession(TriageSessionCreateRequest request) {
@@ -202,7 +205,10 @@ public class TriageService {
 
         PetProfile petProfile = toPetProfile(pet);
 
-        ClaudeTriageResult analyzed = triageAnalyzer.analyze(rawSymptoms, petProfile);
+        // 사진은 보조 근거라, 읽지 못한 장이 있어도 로더가 그 장만 빼고 진행한다.
+        List<TriageImage> images = triageImageLoader.load(session.getId());
+
+        ClaudeTriageResult analyzed = triageAnalyzer.analyze(rawSymptoms, petProfile, images);
 
         TriageResult triageResult = TriageResult.builder()
                 .sessionId(session.getId())

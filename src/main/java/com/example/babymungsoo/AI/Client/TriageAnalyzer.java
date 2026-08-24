@@ -2,7 +2,10 @@ package com.example.babymungsoo.AI.Client;
 
 import com.example.babymungsoo.AI.Dto.ClaudeTriageResult;
 import com.example.babymungsoo.AI.Dto.PetProfile;
+import com.example.babymungsoo.AI.Dto.TriageImage;
 import com.example.babymungsoo.global.exception.CustomException;
+
+import java.util.List;
 
 /**
  * 증상 정보를 받아 응급도 분석 결과를 반환하는 분석기.
@@ -23,8 +26,9 @@ public interface TriageAnalyzer {
      *
      * @param rawSymptoms 초기 증상과 문진 답변을 합친 원본 텍스트
      * @param pet         분석 시점의 반려견 정보
+     * @param images      세션에 첨부된 증상 사진. 없으면 빈 리스트
      * @return 응급도 분석 결과
      * @throws CustomException API 키 미설정, 호출 실패, 타임아웃, 응답 파싱 실패
      */
-    ClaudeTriageResult analyze(String rawSymptoms, PetProfile pet);
+    ClaudeTriageResult analyze(String rawSymptoms, PetProfile pet, List<TriageImage> images);
 }
