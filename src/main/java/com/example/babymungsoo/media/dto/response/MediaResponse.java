@@ -14,7 +14,8 @@ public record MediaResponse(
     public static MediaResponse from(MediaFile mediaFile) {
         return new MediaResponse(
                 mediaFile.getId(),
-                "/api/v1/media/" + mediaFile.getId() + "/file",
+//                "/api/v1/media/" + mediaFile.getId() + "/file",
+                "/api/v1/media/public/" + mediaFile.getPublicId(),
                 mediaFile.getMediaType().name(),
                 mediaFile.getCreatedAt()
         );
