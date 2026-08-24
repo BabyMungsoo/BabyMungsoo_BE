@@ -1,9 +1,11 @@
 package com.example.babymungsoo.user.service;
 
+import com.example.babymungsoo.global.auth.CurrentUserProvider;
+import com.example.babymungsoo.global.exception.CustomException;
+import com.example.babymungsoo.global.exception.ErrorCode;
 import com.example.babymungsoo.user.dto.response.UserMeResponse;
 import com.example.babymungsoo.user.entity.User;
 import com.example.babymungsoo.user.repository.UserRepository;
-import com.example.babymungsoo.global.auth.CurrentUserProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,10 +19,19 @@ public class UserService {
     private final CurrentUserProvider currentUserProvider;
 
     public UserMeResponse getCurrentUser() {
-        Long currentUserId = currentUserProvider.getCurrentUserId();
 
-        User user = userRepository.findById(currentUserId)
-                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
+        Long currentUserId =
+                currentUserProvider
+                        .getCurrentUserId();
+
+        User user =
+                userRepository
+                        .findById(currentUserId)
+                        .orElseThrow(() ->
+                                new CustomException(
+                                        ErrorCode.USER_NOT_FOUND
+                                )
+                        );
 
         return UserMeResponse.from(user);
     }

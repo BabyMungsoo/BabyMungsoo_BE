@@ -29,8 +29,16 @@ public enum ErrorCode {
     AI_API_KEY_NOT_CONFIGURED(HttpStatus.INTERNAL_SERVER_ERROR, "AI 분석 설정이 완료되지 않았습니다."),
     AI_ANALYSIS_FAILED(HttpStatus.BAD_GATEWAY, "AI 분석 요청에 실패했습니다."),
     AI_API_TIMEOUT(HttpStatus.GATEWAY_TIMEOUT, "AI 분석 응답 시간이 초과되었습니다."),
-    AI_RESPONSE_PARSE_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "AI 응답을 해석할 수 없습니다.");
+    AI_RESPONSE_PARSE_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "AI 응답을 해석할 수 없습니다."),
 
+    EMAIL_ALREADY_EXISTS(
+            HttpStatus.CONFLICT,
+        "이미 사용 중인 이메일입니다."
+    ),
+    INVALID_CREDENTIALS(
+            HttpStatus.UNAUTHORIZED,
+        "이메일 또는 비밀번호가 올바르지 않습니다."
+    );
 
     private final HttpStatus status;
     private final String message;

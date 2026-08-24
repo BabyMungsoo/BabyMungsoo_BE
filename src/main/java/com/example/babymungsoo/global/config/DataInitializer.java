@@ -5,33 +5,73 @@ import com.example.babymungsoo.user.entity.User;
 import com.example.babymungsoo.user.entity.UserRole;
 import com.example.babymungsoo.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Profile;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 @Profile("dev")
 @Component
 @RequiredArgsConstructor
-public class DataInitializer implements CommandLineRunner {
-
-    private static final String DEV_USER_EMAIL = "dev@example.com";
-    private static final String DEV_USER_NAME = "개발용 유저";
+public class DataInitializer
+        implements CommandLineRunner {
 
     private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+
+    @Value("${admin.email:}")
+    private String adminEmail;
+
+    @Value("${admin.password:}")
+    private String adminPassword;
+
+    @Value("${admin.name:관리자}")
+    private String adminName;
 
     @Override
     public void run(String... args) {
-        if (userRepository.existsByEmail(DEV_USER_EMAIL)) {
+
+        if (
+                adminEmail == null
+                        || adminEmail.isBlank()
+                        || adminPassword == null
+                        || adminPassword.isBlank()
+        ) {
             return;
         }
 
-        User devUser = User.builder()
-                .email(DEV_USER_EMAIL)
-                .name(DEV_USER_NAME)
-                .loginType(LoginType.EMAIL)
-                .role(UserRole.ADMIN)
-                .build();
+        String normalizedEmail =
+                adminEmail
+                        .trim()
+                        .toLowerCase();
 
-        userRepository.save(devUser);
+        if (
+                userRepository
+                        .existsByEmail(
+                                normalizedEmail
+                        )
+        ) {
+            return;
+        }
+
+        User admin =
+                User.builder()
+                        .email(normalizedEmail)
+                        .password(
+                                passwordEncoder.encode(
+                                        adminPassword
+                                )
+                        )
+                        .name(adminName)
+                        .loginType(
+                                LoginType.EMAIL
+                        )
+                        .role(
+                                UserRole.ADMIN
+                        )
+                        .build();
+
+        userRepository.save(admin);
     }
 }

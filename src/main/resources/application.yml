@@ -1,3 +1,12 @@
+jwt:
+  secret: ${JWT_SECRET}
+  access-token-expiration-ms: ${JWT_ACCESS_TOKEN_EXPIRATION_MS:3600000}
+
+admin:
+  email: ${ADMIN_EMAIL:}
+  password: ${ADMIN_PASSWORD:}
+  name: ${ADMIN_NAME:관리자}
+
 claude:
   api:
     # 실제 키는 CLAUDE_API_KEY 환경변수로 주입한다. 설정 파일에 평문으로 저장하지 않는다.
