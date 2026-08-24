@@ -11,8 +11,10 @@ import com.anthropic.models.messages.StructuredMessageCreateParams;
 import com.anthropic.models.messages.StructuredTextBlock;
 import com.anthropic.models.messages.ThinkingConfigDisabled;
 import com.example.babymungsoo.AI.Dto.ClaudeTriageResult;
+import com.example.babymungsoo.AI.Dto.PetProfile;
 import com.example.babymungsoo.global.exception.CustomException;
 import com.example.babymungsoo.global.exception.ErrorCode;
+import com.example.babymungsoo.pet.entity.PetGender;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -47,6 +49,10 @@ public class ClaudeTriageAnalyzer implements TriageAnalyzer {
             - 모든 문장은 한국어로, 보호자가 이해할 수 있는 쉬운 표현을 사용합니다.
             - 확실하지 않은 경우 더 높은 응급도를 선택합니다.
             - 근거(reason)는 입력된 증상과 답변에서 직접 확인되는 내용만 사용합니다.
+            - 체중과 기저질환은 같은 증상이라도 위험도를 바꿀 수 있으므로 판단에 반영합니다.
+            - 반려견 정보에 "미입력"으로 표시된 항목은 해당 사항이 없다는 뜻이 아니라
+              정보가 제공되지 않았다는 뜻입니다. 없는 것으로 단정하지 말고,
+              그 항목을 근거(reason)에 사용하지 않습니다.
 
             금지 사항
             당신은 수의사가 아니며, 아래는 수의사만 할 수 있는 진료행위입니다.
@@ -69,6 +75,9 @@ public class ClaudeTriageAnalyzer implements TriageAnalyzer {
             - 수의사에게 전달하면 도움이 되는 정보 안내
               (예: "섭취한 제품의 포장을 챙겨 가시면 도움이 됩니다")
             """;
+
+    // 값이 비어 있을 때 프롬프트에 적는 표기. "없음"과 구분해야 하는 이유는 buildUserPrompt 참고.
+    private static final String UNKNOWN = "미입력";
 
     // 응답은 제목 + 근거 2~4문장 + 안내 문단으로 길이가 제한적이다. 초과 과금을 막는 상한.
     private static final long MAX_TOKENS = 2000L;
@@ -107,10 +116,10 @@ public class ClaudeTriageAnalyzer implements TriageAnalyzer {
     }
 
     @Override
-    public ClaudeTriageResult analyze(String rawSymptoms, String breed, Integer age, String ageUnit) {
+    public ClaudeTriageResult analyze(String rawSymptoms, PetProfile pet) {
         validateApiKey();
 
-        String userPrompt = buildUserPrompt(rawSymptoms, breed, age, ageUnit);
+        String userPrompt = buildUserPrompt(rawSymptoms, pet);
 
         try {
             return request(userPrompt);
@@ -130,19 +139,52 @@ public class ClaudeTriageAnalyzer implements TriageAnalyzer {
         }
     }
 
-    private String buildUserPrompt(String rawSymptoms, String breed, Integer age, String ageUnit) {
+    /**
+     * 반려견 정보와 증상을 하나의 사용자 프롬프트로 조립한다.
+     *
+     * <p>비어 있는 항목을 "없음"이 아니라 {@link #UNKNOWN}으로 적는 것이 중요하다.
+     * {@code weight}와 {@code underlyingDisease}는 nullable이라 "질환이 없어서 비었는지"와
+     * "입력을 안 해서 비었는지"를 데이터만으로는 구분할 수 없다. 이때 "없음"으로 적으면
+     * 모델이 기저질환이 없다고 단정해 응급도를 낮출 수 있다. 시스템 프롬프트에
+     * "미입력 항목을 없는 것으로 단정하지 말라"는 규칙을 함께 두어 방향을 맞춘다.
+     */
+    private String buildUserPrompt(String rawSymptoms, PetProfile pet) {
         StringBuilder prompt = new StringBuilder();
 
         prompt.append("[반려견 정보]\n");
-        prompt.append("품종: ").append(StringUtils.hasText(breed) ? breed : "정보 없음").append("\n");
-        prompt.append("나이: ")
-                .append(age != null ? age + (StringUtils.hasText(ageUnit) ? ageUnit : "") : "정보 없음")
-                .append("\n\n");
+        prompt.append("품종: ").append(textOrUnknown(pet.breed())).append("\n");
+        prompt.append("나이: ").append(formatAge(pet)).append("\n");
+        prompt.append("성별: ").append(formatGender(pet.gender())).append("\n");
+        prompt.append("체중: ").append(formatWeight(pet.weight())).append("\n");
+        prompt.append("중성화: ").append(pet.neutered() ? "완료" : "미완료").append("\n");
+        prompt.append("기저질환: ").append(textOrUnknown(pet.underlyingDisease())).append("\n\n");
 
         prompt.append("[증상 및 문진 내용]\n");
         prompt.append(rawSymptoms);
 
         return prompt.toString();
+    }
+
+    private String textOrUnknown(String value) {
+        return StringUtils.hasText(value) ? value : UNKNOWN;
+    }
+
+    private String formatAge(PetProfile pet) {
+        if (pet.age() == null) {
+            return UNKNOWN;
+        }
+        return pet.age() + (StringUtils.hasText(pet.ageUnit()) ? pet.ageUnit() : "");
+    }
+
+    private String formatGender(PetGender gender) {
+        if (gender == null) {
+            return UNKNOWN;
+        }
+        return gender == PetGender.MALE ? "수컷" : "암컷";
+    }
+
+    private String formatWeight(Double weight) {
+        return weight != null ? weight + "kg" : UNKNOWN;
     }
 
     /**

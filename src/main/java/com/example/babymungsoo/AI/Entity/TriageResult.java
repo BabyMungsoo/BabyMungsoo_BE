@@ -1,5 +1,6 @@
 package com.example.babymungsoo.AI.Entity;
 
+import com.example.babymungsoo.pet.entity.PetGender;
 import jakarta.persistence.*;
 import lombok.*;
 import org.springframework.data.annotation.CreatedDate;
@@ -28,10 +29,24 @@ public class TriageResult {
     @Column(unique = true)
     private Long sessionId;
 
+    // 아래는 분석 시점의 반려견 정보 스냅샷이다. Pet은 이후 수정될 수 있으므로,
+    // 왜 그런 판단이 나왔는지 되짚으려면 당시 값이 결과와 함께 남아 있어야 한다.
     private Long petId;
     private String breed;
     private Integer age;
     private String ageUnit;
+
+    @Enumerated(EnumType.STRING)
+    private PetGender gender;
+
+    private Double weight;
+
+    // 원시형 boolean이 아니라 Boolean이다. 이 컬럼이 생기기 전에 저장된 행은 값이 없는데,
+    // false로 읽히면 "중성화하지 않았다"는 기록이 되어 사실과 다를 수 있다.
+    private Boolean neutered;
+
+    @Column(columnDefinition = "TEXT")
+    private String underlyingDisease;
 
     @Enumerated(EnumType.STRING)
     private TriageLevel level;

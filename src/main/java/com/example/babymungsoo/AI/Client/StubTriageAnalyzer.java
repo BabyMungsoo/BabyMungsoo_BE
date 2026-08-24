@@ -1,6 +1,7 @@
 package com.example.babymungsoo.AI.Client;
 
 import com.example.babymungsoo.AI.Dto.ClaudeTriageResult;
+import com.example.babymungsoo.AI.Dto.PetProfile;
 import com.example.babymungsoo.AI.Entity.TriageLevel;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -22,7 +23,7 @@ import java.util.List;
 public class StubTriageAnalyzer implements TriageAnalyzer {
 
     @Override
-    public ClaudeTriageResult analyze(String rawSymptoms, String breed, Integer age, String ageUnit) {
+    public ClaudeTriageResult analyze(String rawSymptoms, PetProfile pet) {
         return new ClaudeTriageResult(
                 TriageLevel.WATCH,
                 "[MOCK] 경과 관찰이 필요한 상태입니다",

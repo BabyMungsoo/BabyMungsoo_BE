@@ -1,6 +1,7 @@
 package com.example.babymungsoo.AI.Client;
 
 import com.example.babymungsoo.AI.Dto.ClaudeTriageResult;
+import com.example.babymungsoo.AI.Dto.PetProfile;
 import com.example.babymungsoo.global.exception.CustomException;
 
 /**
@@ -21,11 +22,9 @@ public interface TriageAnalyzer {
      * 증상 정보를 분석해 응급도 결과를 반환한다.
      *
      * @param rawSymptoms 초기 증상과 문진 답변을 합친 원본 텍스트
-     * @param breed       반려견 품종 (없으면 null)
-     * @param age         반려견 나이 (없으면 null)
-     * @param ageUnit     나이 단위 (예: "세")
+     * @param pet         분석 시점의 반려견 정보
      * @return 응급도 분석 결과
      * @throws CustomException API 키 미설정, 호출 실패, 타임아웃, 응답 파싱 실패
      */
-    ClaudeTriageResult analyze(String rawSymptoms, String breed, Integer age, String ageUnit);
+    ClaudeTriageResult analyze(String rawSymptoms, PetProfile pet);
 }

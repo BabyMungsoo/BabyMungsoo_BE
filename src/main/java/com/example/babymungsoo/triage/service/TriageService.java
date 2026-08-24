@@ -3,6 +3,7 @@ package com.example.babymungsoo.triage.service;
 import com.example.babymungsoo.AI.Client.TriageAnalyzer;
 import com.example.babymungsoo.AI.Dto.ClaudeTriageResult;
 import com.example.babymungsoo.AI.Entity.TriageResult;
+import com.example.babymungsoo.AI.Dto.PetProfile;
 import com.example.babymungsoo.AI.service.TriageResultService;
 import com.example.babymungsoo.global.auth.CurrentUserProvider;
 import com.example.babymungsoo.global.exception.CustomException;
@@ -195,23 +196,24 @@ public class TriageService {
             throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
         }
 
-        // 품종·나이는 클라이언트 입력을 신뢰하지 않고 세션이 가리키는 반려견에서 조회한다.
+        // 반려견 정보는 클라이언트 입력을 신뢰하지 않고 세션이 가리키는 반려견에서 조회한다.
         Pet pet = petRepository.findByIdAndUser_Id(session.getPetId(), session.getUserId())
                 .orElseThrow(() -> new CustomException(ErrorCode.PET_NOT_FOUND));
 
-        ClaudeTriageResult analyzed = triageAnalyzer.analyze(
-                rawSymptoms,
-                pet.getBreed(),
-                pet.getAge(),
-                AGE_UNIT
-        );
+        PetProfile petProfile = toPetProfile(pet);
+
+        ClaudeTriageResult analyzed = triageAnalyzer.analyze(rawSymptoms, petProfile);
 
         TriageResult triageResult = TriageResult.builder()
                 .sessionId(session.getId())
                 .petId(session.getPetId())
-                .breed(pet.getBreed())
-                .age(pet.getAge())
-                .ageUnit(AGE_UNIT)
+                .breed(petProfile.breed())
+                .age(petProfile.age())
+                .ageUnit(petProfile.ageUnit())
+                .gender(petProfile.gender())
+                .weight(petProfile.weight())
+                .neutered(petProfile.neutered())
+                .underlyingDisease(petProfile.underlyingDisease())
                 .level(analyzed.level())
                 .title(analyzed.title())
                 .reason(analyzed.reason())
@@ -233,6 +235,25 @@ public class TriageService {
     }
 
     // ----- 내부 헬퍼 -----
+
+    /**
+     * 영속 엔티티를 분석 입력용 값 객체로 옮긴다.
+     *
+     * <p>엔티티를 그대로 분석기에 넘기지 않는 이유는 두 가지다. 분석기가 영속 객체를 쥐면
+     * 트랜잭션 밖에서 지연 로딩을 건드릴 위험이 생기고, 분석 시점의 값을 그대로 결과에
+     * 스냅샷으로 남겨야 하는데 엔티티는 이후 수정될 수 있다.
+     */
+    private PetProfile toPetProfile(Pet pet) {
+        return new PetProfile(
+                pet.getBreed(),
+                pet.getAge(),
+                AGE_UNIT,
+                pet.getGender(),
+                pet.getWeight(),
+                pet.isNeutered(),
+                pet.getUnderlyingDisease()
+        );
+    }
 
     /**
      * 미리 업로드해 둔 사진들을 방금 만든 세션에 연결한다.
