@@ -4,7 +4,10 @@ import com.example.babymungsoo.record.entity.AnalysisRecord;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
 import lombok.Getter;
+
+import java.util.List;
 
 @Getter
 public class AnalysisRecordCreateRequestDto {
@@ -30,19 +33,22 @@ public class AnalysisRecordCreateRequestDto {
 
     private String aiGuide;
 
-    /** 분석에 쓴 사진의 media ID. 사진 없이 문진만으로 분석했다면 비워 둡니다. */
-    private Long mediaId;
+    /** 분석에 쓴 사진들의 media ID 목록(최대 5장). 사진 없이 문진만으로 분석했다면 비워 둡니다. */
+    @Size(max = 5, message = "사진은 최대 5장까지 등록할 수 있습니다.")
+    private List<Long> mediaIds;
 
     public AnalysisRecord toEntity() {
-        return AnalysisRecord.builder()
+        AnalysisRecord.AnalysisRecordBuilder builder = AnalysisRecord.builder()
                 .userId(userId)
                 .dogId(dogId)
                 .symptomText(symptomText)
                 .aiResult(aiResult)
                 .emergencyLevel(emergencyLevel)
                 .suspectedDisease(suspectedDisease)
-                .aiGuide(aiGuide)
-                .mediaId(mediaId)
-                .build();
+                .aiGuide(aiGuide);
+        if (mediaIds != null) {
+            builder.mediaIds(mediaIds);
+        }
+        return builder.build();
     }
 }

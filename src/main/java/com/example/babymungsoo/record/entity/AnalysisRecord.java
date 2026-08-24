@@ -3,6 +3,8 @@ package com.example.babymungsoo.record.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(
@@ -41,8 +43,12 @@ public class AnalysisRecord {
     @Column(columnDefinition = "TEXT")
     private String aiGuide;
 
-    /** 분석에 쓴 사진 (media.id). 문진 분석과 사진 업로드가 별개 흐름이라 없을 수 있습니다. */
-    private Long mediaId;
+    /** 분석에 쓴 사진들 (media.id 목록, 최대 5장). 문진 분석과 사진 업로드가 별개 흐름이라 없을 수 있습니다. */
+    @ElementCollection
+    @CollectionTable(name = "analysis_record_media", joinColumns = @JoinColumn(name = "record_id"))
+    @Column(name = "media_id")
+    @Builder.Default
+    private List<Long> mediaIds = new ArrayList<>();
 
     @Column(nullable = false)
     private LocalDateTime createdAt;
