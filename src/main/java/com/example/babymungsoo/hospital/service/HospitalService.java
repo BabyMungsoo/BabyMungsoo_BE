@@ -1,5 +1,6 @@
 package com.example.babymungsoo.hospital.service;
 
+import com.example.babymungsoo.AI.Entity.TriageLevel;
 import com.example.babymungsoo.global.exception.CustomException;
 import com.example.babymungsoo.global.exception.ErrorCode;
 import com.example.babymungsoo.hospital.entity.Hospital;
@@ -30,7 +31,7 @@ public class HospitalService {
 
         validateCoordinate(lat, lng);
 
-        EmergencyLevel emergencyLevel = parseLevel(level);
+        TriageLevel emergencyLevel = parseLevel(level);
 
         double range = 0.045;
 
@@ -39,7 +40,7 @@ public class HospitalService {
         double minLng = lng - range;
         double maxLng = lng + range;
 
-        if (emergencyLevel == EmergencyLevel.IMMEDIATE) {
+        if (emergencyLevel == TriageLevel.IMMEDIATE) {
             return hospitalRepository.findAvailableHospitalsByLocation(
                     minLat, maxLat, minLng, maxLng
             );
@@ -60,17 +61,13 @@ public class HospitalService {
         }
     }
 
-    private EmergencyLevel parseLevel(String level) {
+    // AI 분석이 반환하는 TriageLevel을 그대로 받는다. 병원 도메인이 EmergencyLevel을 따로 두면
+    // AI가 준 WATCH가 400으로 튕겨, 분석 결과에서 병원 찾기로 넘어가는 경로가 끊긴다.
+    private TriageLevel parseLevel(String level) {
         try {
-            return EmergencyLevel.valueOf(level);
+            return TriageLevel.valueOf(level);
         } catch (IllegalArgumentException | NullPointerException e) {
             throw new CustomException(ErrorCode.INVALID_EMERGENCY_LEVEL);
         }
-    }
-
-    public enum EmergencyLevel {
-        IMMEDIATE,
-        URGENT,
-        NORMAL
     }
 }
