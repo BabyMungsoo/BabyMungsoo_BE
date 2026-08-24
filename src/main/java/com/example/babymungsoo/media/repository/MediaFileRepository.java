@@ -21,5 +21,7 @@ public interface MediaFileRepository extends JpaRepository<MediaFile, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     List<MediaFile> findWithLockByIdInAndUserId(List<Long> ids, Long userId);
 
-    List<MediaFile> findAllBySessionId(Long sessionId);
+    // 정렬을 명시하지 않으면 DB가 돌려주는 순서에 의존해 프롬프트의 "사진 1, 사진 2" 라벨이
+    // 호출마다 달라질 수 있다. 업로드 순서(id 오름차순)로 고정한다.
+    List<MediaFile> findAllBySessionIdOrderByIdAsc(Long sessionId);
 }

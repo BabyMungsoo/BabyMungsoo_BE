@@ -51,7 +51,7 @@ public class TriageImageLoader {
     private final StorageService storageService;
 
     public List<TriageImage> load(Long sessionId) {
-        List<MediaFile> mediaFiles = mediaFileRepository.findAllBySessionId(sessionId);
+        List<MediaFile> mediaFiles = mediaFileRepository.findAllBySessionIdOrderByIdAsc(sessionId);
         if (mediaFiles.isEmpty()) {
             return List.of();
         }

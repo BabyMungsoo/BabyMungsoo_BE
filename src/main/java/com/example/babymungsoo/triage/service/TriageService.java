@@ -48,6 +48,9 @@ public class TriageService {
     // Pet.age는 단위 없는 정수로 저장되므로 분석 입력에서도 '세'로 해석한다.
     private static final String AGE_UNIT = "세";
 
+    // 문진 한 건에 첨부할 수 있는 사진 수. 분석 입력에 넣는 장수와 같은 값이어야 한다.
+    private static final int MAX_MEDIA_PER_SESSION = 5;
+
     private final TriageSessionRepository triageSessionRepository;
     private final QuestionRepository questionRepository;
     private final AnswerRepository answerRepository;
@@ -150,13 +153,13 @@ public class TriageService {
     public TriageSessionResponse completeSession(Long sessionId) {
         TriageSession session = findSession(sessionId);
         session.complete();
-        return TriageSessionResponse.from(session, mediaFileRepository.findAllBySessionId(sessionId));
+        return TriageSessionResponse.from(session, mediaFileRepository.findAllBySessionIdOrderByIdAsc(sessionId));
     }
 
 
     public TriageSessionResponse getSession(Long sessionId) {
         TriageSession session = findSession(sessionId);
-        return TriageSessionResponse.from(session, mediaFileRepository.findAllBySessionId(sessionId));
+        return TriageSessionResponse.from(session, mediaFileRepository.findAllBySessionIdOrderByIdAsc(sessionId));
     }
 
 
@@ -276,6 +279,13 @@ public class TriageService {
         // 같은 id가 중복으로 와도(예: [4, 4]) 조회 결과는 한 건이라, 중복 제거한 개수와 비교해야
         // 정상 소유의 미디어를 MEDIA_NOT_FOUND로 잘못 거부하지 않는다.
         List<Long> distinctMediaIds = mediaIds.stream().distinct().toList();
+
+        // 상한을 여기서 막지 않으면 6장 이상이 그대로 저장된 뒤 분석 단계에서 조용히 잘려나가,
+        // 보호자는 올린 사진이 모두 반영된 줄 알게 된다. 저장 시점에 거부해 그 어긋남을 없앤다.
+        if (distinctMediaIds.size() > MAX_MEDIA_PER_SESSION) {
+            throw new CustomException(ErrorCode.TOO_MANY_MEDIA);
+        }
+
         List<MediaFile> mediaFiles = mediaFileRepository.findWithLockByIdInAndUserId(distinctMediaIds, userId);
         if (mediaFiles.size() != distinctMediaIds.size()) {
             throw new CustomException(ErrorCode.MEDIA_NOT_FOUND);
