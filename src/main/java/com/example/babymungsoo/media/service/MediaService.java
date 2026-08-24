@@ -48,6 +48,7 @@ public class MediaService {
 
     // 장당 크기 상한. Claude 제한은 base64 기준 10MB인데 base64는 원본보다 약 33% 커져
     // 원본 7.5MB가 경계다. 여유를 두고 7MB로 잡는다.
+    // TriageImageLoader.MAX_IMAGE_BYTES와 같은 값이어야 한다.
     private static final long MAX_FILE_BYTES = 7L * 1024 * 1024;
 
     private final MediaFileRepository mediaFileRepository;
