@@ -26,6 +26,7 @@ import javax.imageio.stream.ImageInputStream;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.Set;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -68,6 +69,7 @@ public class MediaService {
         String fileUrl = storageService.upload(file);
 
         MediaFile mediaFile = MediaFile.builder()
+                .publicId(UUID.randomUUID())
                 .userId(currentUserProvider.getCurrentUserId())
                 .fileUrl(fileUrl)
                 .contentType(contentType)
@@ -91,6 +93,18 @@ public class MediaService {
         MediaFile mediaFile = findOwnedMedia(mediaId);
         Resource resource = storageService.load(mediaFile.getFileUrl());
         return new MediaFileDownload(resource, mediaFile.getContentType());
+    }
+
+    public MediaFileDownload downloadPublicFile(UUID publicId) {
+        MediaFile mediaFile = mediaFileRepository.findByPublicId(publicId)
+                .orElseThrow(() -> new CustomException(ErrorCode.MEDIA_NOT_FOUND));
+
+        Resource resource = storageService.load(mediaFile.getFileUrl());
+
+        return new MediaFileDownload(
+                resource,
+                mediaFile.getContentType()
+        );
     }
 
     @Transactional
