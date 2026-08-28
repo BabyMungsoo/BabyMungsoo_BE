@@ -1,6 +1,7 @@
 package com.example.babymungsoo.triage.service;
 
 import com.example.babymungsoo.AI.Client.TriageAnalyzer;
+import com.example.babymungsoo.AI.Client.TriageQuestionGenerator;
 import com.example.babymungsoo.AI.Dto.ClaudeTriageResult;
 import com.example.babymungsoo.AI.Entity.TriageResult;
 import com.example.babymungsoo.AI.Dto.PetProfile;
@@ -20,6 +21,7 @@ import com.example.babymungsoo.triage.dto.request.TriageSessionCreateRequest;
 import com.example.babymungsoo.triage.dto.response.AnswerResponse;
 import com.example.babymungsoo.triage.dto.response.QuestionResponse;
 import com.example.babymungsoo.triage.dto.response.TriageAnalyzeResponse;
+import com.example.babymungsoo.triage.dto.response.TriageQuestionSetResponse;
 import com.example.babymungsoo.triage.dto.response.TriageSessionResponse;
 import com.example.babymungsoo.triage.entity.Answer;
 import com.example.babymungsoo.triage.entity.Question;
@@ -29,17 +31,20 @@ import com.example.babymungsoo.triage.repository.AnswerRepository;
 import com.example.babymungsoo.triage.repository.QuestionRepository;
 import com.example.babymungsoo.triage.repository.TriageSessionRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -59,6 +64,7 @@ public class TriageService {
     private final MediaFileRepository mediaFileRepository;
     private final CurrentUserProvider currentUserProvider;
     private final TriageAnalyzer triageAnalyzer;
+    private final TriageQuestionGenerator triageQuestionGenerator;
     private final TriageImageLoader triageImageLoader;
 
     @Transactional
@@ -90,12 +96,18 @@ public class TriageService {
     }
 
 
+    /**
+     * 아직 답하지 않은 질문 중 첫 번째를 돌려준다. 다 답했거나 생성된 질문이 없으면 null이다.
+     *
+     * <p>질문은 그 세션을 위해 생성된 것만 본다. 증상 분류로 마스터 질문을 꺼내던 방식은
+     * 보호자가 분류를 직접 고르는 흐름이었는데, 지금은 초기 증상을 보고 질문을 만들기
+     * 때문에 세션에 붙은 질문이 곧 물어볼 전부다.
+     */
     public QuestionResponse getNextQuestion(Long sessionId) {
         TriageSession session = findSession(sessionId);
 
-        String category = session.getSymptomCategory();
-        if (category == null || category.isBlank()) {
-            // 세션에 증상 카테고리가 없으면 맞춤 질문을 제공하지 않는다(전체 카테고리 혼합 방지).
+        List<Question> sessionQuestions = questionRepository.findBySessionIdOrderByOrderNoAsc(sessionId);
+        if (sessionQuestions.isEmpty()) {
             return null;
         }
 
@@ -105,7 +117,7 @@ public class TriageService {
                 .map(Question::getId)
                 .collect(Collectors.toSet());
 
-        return questionRepository.findBySymptomCategoryOrderByOrderNoAsc(category).stream()
+        return sessionQuestions.stream()
                 .filter(question -> !answeredQuestionIds.contains(question.getId()))
                 .findFirst()
                 .map(QuestionResponse::from)
@@ -129,11 +141,11 @@ public class TriageService {
             question = questionRepository.findById(request.questionId())
                     .orElseThrow(() -> new CustomException(ErrorCode.QUESTION_NOT_FOUND));
 
-            String sessionCategory = session.getSymptomCategory();
-            if (sessionCategory != null && !sessionCategory.isBlank()) {
-                if (!Objects.equals(sessionCategory, question.getSymptomCategory())) {
-                    throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
-                }
+            // 남의 세션 질문에 답하는 것을 막는다. 마스터 질문(sessionId = null)은
+            // 특정 세션 소유가 아니므로 기존처럼 그대로 허용한다.
+            Long questionSessionId = question.getSessionId();
+            if (questionSessionId != null && !Objects.equals(questionSessionId, sessionId)) {
+                throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
             }
         }
 
@@ -162,6 +174,63 @@ public class TriageService {
         return TriageSessionResponse.from(session, mediaFileRepository.findAllBySessionIdOrderByIdAsc(sessionId));
     }
 
+
+    /**
+     * 초기 증상을 보고 추가로 물어볼 질문을 만들어 세션에 저장한다.
+     *
+     * <p>외부 AI 호출이 있으므로 {@code analyze()}와 같은 이유로 트랜잭션 밖에서 실행한다.
+     * 여기서 쓰는 조회·저장은 모두 리포지토리 단위 트랜잭션으로 처리되고, 지연 로딩이
+     * 필요한 연관은 건드리지 않는다.
+     *
+     * <p><b>질문 생성 실패는 분석을 막지 않는다.</b> 호출 실패·타임아웃·파싱 실패는
+     * 로그만 남기고 "질문 없음"으로 응답한다. 추가 문진은 판단을 돕는 보조 수단이지
+     * 필수 단계가 아니며, 여기서 막으면 정작 급한 보호자가 응급도 판단조차 못 받는다.
+     *
+     * <p>같은 세션을 다시 호출하면 이미 만들어 둔 질문을 그대로 돌려준다. 화면 재진입이나
+     * 재시도로 질문이 중복 생성되면 보호자가 같은 질문을 두 번 보게 된다.
+     */
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public TriageQuestionSetResponse generateQuestions(Long sessionId) {
+        TriageSession session = findSession(sessionId);
+
+        List<Question> existing = questionRepository.findBySessionIdOrderByOrderNoAsc(sessionId);
+        if (!existing.isEmpty()) {
+            return TriageQuestionSetResponse.from(existing);
+        }
+
+        String initialSymptom = session.getInitialSymptom();
+        if (initialSymptom == null || initialSymptom.isBlank()) {
+            // 물어볼 근거가 없으면 질문도 만들 수 없다.
+            return TriageQuestionSetResponse.none();
+        }
+
+        Pet pet = petRepository.findByIdAndUser_Id(session.getPetId(), session.getUserId())
+                .orElseThrow(() -> new CustomException(ErrorCode.PET_NOT_FOUND));
+
+        List<TriageImage> images = triageImageLoader.load(sessionId);
+
+        List<String> contents;
+        try {
+            contents = triageQuestionGenerator
+                    .generate(initialSymptom, toPetProfile(pet), images)
+                    .usableContents();
+        } catch (RuntimeException e) {
+            log.warn("추가 질문 생성 실패 - 질문 없이 진행합니다. sessionId={}, reason={}",
+                    sessionId, e.getMessage());
+            return TriageQuestionSetResponse.none();
+        }
+
+        if (contents.isEmpty()) {
+            return TriageQuestionSetResponse.none();
+        }
+
+        List<Question> questions = new ArrayList<>();
+        for (int i = 0; i < contents.size(); i++) {
+            questions.add(Question.forSession(sessionId, i + 1, contents.get(i)));
+        }
+
+        return TriageQuestionSetResponse.from(questionRepository.saveAll(questions));
+    }
 
     /**
      * 완료된 문진 세션을 분석하고 결과를 저장한다.
@@ -365,9 +434,15 @@ public class TriageService {
         return rawSymptoms.toString();
     }
 
+    /**
+     * 마스터 질문만 조회한다.
+     *
+     * <p>세션별 AI 생성 질문이 같은 테이블에 있으므로 조건을 걸지 않으면
+     * 남의 세션 질문이 목록에 섞인다.
+     */
     private List<Question> findQuestionsByCategory(String symptomCategory) {
         return (symptomCategory == null || symptomCategory.isBlank())
-                ? questionRepository.findAllByOrderByOrderNoAsc()
-                : questionRepository.findBySymptomCategoryOrderByOrderNoAsc(symptomCategory);
+                ? questionRepository.findBySessionIdIsNullOrderByOrderNoAsc()
+                : questionRepository.findBySymptomCategoryAndSessionIdIsNullOrderByOrderNoAsc(symptomCategory);
     }
 }

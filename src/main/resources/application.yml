@@ -13,6 +13,10 @@ claude:
     # 기본값을 비워 두어 키 미설정을 AI_API_KEY_NOT_CONFIGURED로 정확히 감지한다.
     key: ${CLAUDE_API_KEY:}
     model: claude-sonnet-5
+    # 추가 문진 질문 생성용 모델. 기본값은 분석 모델과 같다.
+    # 질문 생성은 응급도 판정을 하지 않아 더 가벼운 모델로 낮출 여지가 있는데,
+    # 한국어 질문 품질을 실호출로 확인한 뒤 바꾸기 위해 설정만 분리해 둔다.
+    question-model: ${CLAUDE_QUESTION_MODEL:claude-sonnet-5}
     # true면 StubTriageAnalyzer(실호출·과금 없음), false면 ClaudeTriageAnalyzer.
     # 구현체는 @ConditionalOnProperty로 전환하며 matchIfMissing을 쓰지 않으므로,
     # 이 속성이 없으면 두 빈이 모두 등록되지 않아 기동에 실패한다. 반드시 유지할 것.
