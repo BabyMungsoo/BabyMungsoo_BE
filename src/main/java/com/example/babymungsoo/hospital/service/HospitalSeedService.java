@@ -231,8 +231,13 @@ public class HospitalSeedService {
         return summary;
     }
 
-    /** 상호명에 24시간 표기가 있으면 24시간 운영으로 본다. */
-    private static boolean looksOpen24Hours(String hospitalName) {
+    /**
+     * 상호명에 24시간 표기가 있으면 24시간 운영으로 본다.
+     *
+     * <p>기존 데이터를 채우는 백필 러너도 같은 판정을 써야 해서 공개해 둔다.
+     * 규칙이 두 군데로 갈라지면 시드와 백필 결과가 달라진다.
+     */
+    public static boolean looksOpen24Hours(String hospitalName) {
         return StringUtils.hasText(hospitalName) && OPEN_24H_NAME.matcher(hospitalName).find();
     }
 
