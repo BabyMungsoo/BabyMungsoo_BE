@@ -13,19 +13,34 @@ import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.regex.Pattern;
 
 /**
  * 카카오 장소검색 결과를 우리 {@code hospital} 테이블로 적재(시드)하는 서비스.
  *
  * <p>카카오 장소 ID를 멱등 키로 써서, 같은 지역을 여러 번 시드해도
  * 이미 있는 병원은 갱신(이름·주소·전화·좌표만)하고 새 병원만 추가한다.
- * is24hour·rating·openHours는 카카오가 주지 않으므로 신규 저장 시 기본값(24시간=false)으로 두고,
+ * rating·openHours는 카카오가 주지 않으므로 신규 저장 시 null로 두고,
+ * is24hour는 상호명으로 추정해 채운다({@link #OPEN_24H_NAME}).
  * 이후 운영자가 보정하면 그 값을 시드가 덮어쓰지 않는다.
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class HospitalSeedService {
+
+    /**
+     * 상호명으로 24시간 운영 여부를 추정하는 패턴.
+     *
+     * <p>카카오 키워드검색은 영업시간을 주지 않고, 영업시간을 주는 API(Google Places 등)는
+     * 유료 구간이라 쓸 수 없다. 대신 국내 동물병원이 24시간 응급진료를 하면 상호에 '24시'를
+     * 붙이는 관행을 이용한다. '24아프리카동물메디컬센터'처럼 '시' 없이 붙는 곳도 있어
+     * '24' + 한글도 함께 잡는다.
+     *
+     * <p>추정값이라 100% 정확하지 않다. 상호만 24시고 야간은 예약제인 곳이 섞일 수 있으므로,
+     * 화면에서는 반드시 '방문 전 전화 확인' 안내와 함께 보여준다.
+     */
+    private static final Pattern OPEN_24H_NAME = Pattern.compile("24\\s?시|24[가-힣]");
 
     // 전국 일괄 시드의 지점당 검색 반경(m). 카카오는 검색 1회당 최대 45건이라
     // 도심은 이 반경으로 촘촘히, 지방은 도시별 1지점으로 커버한다.
@@ -166,7 +181,7 @@ public class HospitalSeedService {
                     .phone(phone)
                     .latitude(lat)
                     .longitude(lng)
-                    .is24hour(false)   // 카카오 키워드검색은 24시간 여부를 주지 않음 → 기본 false
+                    .is24hour(looksOpen24Hours(doc.placeName()))
                     .openHours(null)
                     .rating(null)
                     .lastUpdated(now)
@@ -214,6 +229,11 @@ public class HospitalSeedService {
                 new NationwideSeedResult(NATIONWIDE_SPOTS.size(), succeeded, failed, created, updated);
         log.info("전국 동물병원 시드 완료 - {}", summary);
         return summary;
+    }
+
+    /** 상호명에 24시간 표기가 있으면 24시간 운영으로 본다. */
+    private static boolean looksOpen24Hours(String hospitalName) {
+        return StringUtils.hasText(hospitalName) && OPEN_24H_NAME.matcher(hospitalName).find();
     }
 
     /** 전국 시드 대상 지점(중심 좌표 + 지역명). */
