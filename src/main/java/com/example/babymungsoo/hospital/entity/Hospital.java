@@ -53,6 +53,17 @@ public class Hospital {
     private LocalDateTime lastUpdated;
 
     /**
+     * 상호명으로 24시간 운영이 확인됐을 때 표시한다.
+     *
+     * <p>이 값을 true 로 바꾸는 경로는 시드(신규 저장)와 백필 두 곳뿐이고,
+     * {@link #updateFromKakao} 는 일부러 건드리지 않는다 — 수기 보정값을 지키기 위해서다.
+     */
+    public void markOpen24Hours(LocalDateTime lastUpdated) {
+        this.is24hour = true;
+        this.lastUpdated = lastUpdated;
+    }
+
+    /**
      * 카카오 검색 결과로 채운 필드(이름·주소·전화·좌표)만 갱신한다.
      * is24hour·rating·openHours는 카카오 키워드검색이 주지 않는 값이라,
      * 운영자가 수기로 보정한 값을 시드 재실행 때 덮어쓰지 않도록 그대로 둔다.
