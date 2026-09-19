@@ -51,6 +51,11 @@ public class Hospital {
     @Column(length = 500)
     private String features;
 
+    // 이 행을 채운 큐레이션 항목의 이름(hospitals-24h-*.json 의 name). 나중에 검색어를 고쳐
+    // 다른 장소로 매칭되면, 같은 키로 채워졌던 이전 행을 찾아 되돌리기 위한 연결 고리다.
+    @Column(unique = true)
+    private String curatedKey;
+
     private Float rating;
 
     // 리뷰 개수. 시안의 "4.8 (256)"에서 (256)에 해당. 데이터 확보 전엔 null.
@@ -80,8 +85,9 @@ public class Hospital {
      * 운영시간·진료 분야·특징까지 함께 채운다. 전화는 카카오 값이 비어 있을 때만 목록 값을 쓴다 —
      * 카카오 쪽이 더 자주 갱신되기 때문이다.
      */
-    public void applyCurated(String openHours, String specialties, String features,
+    public void applyCurated(String curatedKey, String openHours, String specialties, String features,
                              String fallbackPhone, LocalDateTime lastUpdated) {
+        this.curatedKey = curatedKey;
         this.is24hour = true;
         this.openHours = openHours;
         this.specialties = specialties;
@@ -89,6 +95,21 @@ public class Hospital {
         if (isMissingPhone() && fallbackPhone != null && !fallbackPhone.isBlank()) {
             this.phone = fallbackPhone;
         }
+        this.lastUpdated = lastUpdated;
+    }
+
+    /**
+     * 큐레이션으로 채웠던 값을 걷어낸다. 검색어를 고쳐 같은 항목이 다른 장소로 옮겨 갔을 때,
+     * 잘못 채워졌던 행이 24시간 병원으로 남지 않게 한다.
+     *
+     * @param open24HoursByName 상호명만으로 판정한 24시간 여부 — 큐레이션 전 상태로 되돌리는 기준
+     */
+    public void clearCurated(boolean open24HoursByName, LocalDateTime lastUpdated) {
+        this.curatedKey = null;
+        this.is24hour = open24HoursByName;
+        this.openHours = null;
+        this.specialties = null;
+        this.features = null;
         this.lastUpdated = lastUpdated;
     }
 
