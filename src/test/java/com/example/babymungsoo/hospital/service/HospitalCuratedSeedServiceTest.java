@@ -122,8 +122,6 @@ class HospitalCuratedSeedServiceTest {
         assertThat(hospital.getAddress()).isEqualTo("서울 강남구 삼성로 614");
         assertThat(hospital.getCuratedKey()).isEqualTo("VIP동물의료센터 청담점");
         assertThat(hospital.getIs24hour()).isTrue();
-        assertThat(hospital.getOpenHours()).contains("24시간");
-        assertThat(hospital.getSpecialties()).contains("CT/MRI");
         assertThat(result.created()).isEqualTo(1);
     }
 
@@ -143,7 +141,7 @@ class HospitalCuratedSeedServiceTest {
     }
 
     @Test
-    @DisplayName("이미 시드된 병원이면 새 행을 만들지 않고 24시간 표시와 운영시간만 덧씌운다")
+    @DisplayName("이미 시드된 병원이면 새 행을 만들지 않고 24시간 표시만 덧씌운다")
     void updatesExistingRowInsteadOfInserting() {
         when(kakaoLocalClient.searchByName(anyString())).thenReturn(List.of());
         when(kakaoLocalClient.searchByName("웨스턴동물의료센터")).thenReturn(List.of(
@@ -156,8 +154,6 @@ class HospitalCuratedSeedServiceTest {
 
         verify(hospitalRepository, never()).save(any());
         assertThat(existing.getIs24hour()).isTrue();
-        assertThat(existing.getOpenHours()).contains("24시간");
-        assertThat(existing.getSpecialties()).isNotBlank();
         assertThat(existing.getCuratedKey()).isEqualTo("웨스턴동물의료센터");
         assertThat(result.updated()).isEqualTo(1);
         assertThat(result.created()).isZero();
@@ -172,7 +168,7 @@ class HospitalCuratedSeedServiceTest {
         ));
         // 이전 실행에서 구 필터만으로 잘못 들어갔던 행
         Hospital wrong = seededHospital("w-1", "동물메디컬센터W", "02-323-8275");
-        wrong.applyCurated("웨스턴동물의료센터", "야간", "야간응급", null, LocalDateTime.now());
+        wrong.applyCurated("웨스턴동물의료센터", null, LocalDateTime.now());
         // findByCuratedKey 는 항목마다 불리므로 기본은 비어 있게 두고, 문제의 항목만 이전 행을 돌려준다
         when(hospitalRepository.findByCuratedKey(anyString())).thenReturn(Optional.empty());
         when(hospitalRepository.findByCuratedKey("웨스턴동물의료센터")).thenReturn(Optional.of(wrong));
@@ -182,8 +178,6 @@ class HospitalCuratedSeedServiceTest {
 
         assertThat(wrong.getCuratedKey()).isNull();
         assertThat(wrong.getIs24hour()).isFalse();
-        assertThat(wrong.getOpenHours()).isNull();
-        assertThat(wrong.getSpecialties()).isNull();
         verify(hospitalRepository).save(any());
     }
 

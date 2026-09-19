@@ -34,7 +34,7 @@ import tools.jackson.databind.ObjectMapper;
  * '24시'가 있는 곳만 24시간으로 잡는다. 'OO동물의료센터'처럼 이름에 24가 없는 24시간 병원은
  * 그 방식으로는 영영 안 잡히므로, 이 목록으로 보완한다.
  *
- * <p>목록에는 상호명·구·전화·운영시간·진료 분야만 두고, 좌표·주소·장소 ID 는 기동 시
+ * <p>목록에는 상호명·구·전화만 두고, 좌표·주소·장소 ID 는 기동 시
  * 카카오 검색으로 확정한다. 블로그 등에서 옮겨 적은 주소는 오타나 옛 주소일 수 있어
  * 그대로 저장하지 않는다. 카카오에서 못 찾는 병원은 저장하지 않고 로그만 남긴다 —
  * 좌표 없는 병원은 지도에 못 올리고, 틀린 좌표는 응급 상황에서 더 해롭다.
@@ -44,6 +44,9 @@ import tools.jackson.databind.ObjectMapper;
  * 적어도 이름이 맞으면 저장하고, 구가 달랐다는 사실은 결과에 남겨 목록을 고칠 수 있게 한다.
  * (처음엔 구만 검사했더니 '서울동물메디컬센터'에 마포구의 다른 병원이 들어가고,
  * 구를 잘못 적은 '우리동생동물병원'은 영영 안 잡혔다.)
+ *
+ * <p>운영시간·진료분야 같은 문구는 검증할 수 없어 싣지 않는다 — 이 목록이 주는 정보는
+ * "존재하며 24시간을 표방한다" 뿐이고, 화면은 늘 '방문 전 전화 확인' 과 함께 보여준다.
  *
  * <p>장소 ID 기준 멱등이라 여러 번 실행해도 행이 늘지 않는다. 항목이 이전에 채웠던 행은
  * {@code curatedKey} 로 기억해 두므로, 검색어를 고쳐 다른 장소로 옮겨 가면 이전 행은 되돌린다.
@@ -99,8 +102,7 @@ public class HospitalCuratedSeedService {
 
                 var existing = hospitalRepository.findByKakaoPlaceId(doc.id());
                 if (existing.isPresent()) {
-                    existing.get().applyCurated(entry.name(), entry.openHours(), entry.specialties(),
-                            entry.phone(), now);
+                    existing.get().applyCurated(entry.name(), entry.phone(), now);
                     updated++;
                     continue;
                 }
@@ -115,8 +117,7 @@ public class HospitalCuratedSeedService {
                         .is24hour(true)
                         .lastUpdated(now)
                         .build();
-                hospital.applyCurated(entry.name(), entry.openHours(), entry.specialties(),
-                        entry.phone(), now);
+                hospital.applyCurated(entry.name(), entry.phone(), now);
                 hospitalRepository.save(hospital);
                 created++;
             }
@@ -277,8 +278,6 @@ public class HospitalCuratedSeedService {
      * @param district    출처에 적힌 구. 같은 이름의 지점이 여럿일 때 고르는 데 쓴다
      * @param address     출처에 적힌 주소. 저장에는 쓰지 않고 사람이 대조할 때 참고한다
      * @param phone       카카오에 전화가 없을 때만 쓰는 대체 전화
-     * @param openHours   운영시간 문구
-     * @param specialties 주요 진료 분야 (쉼표 구분)
      */
     @JsonIgnoreProperties(ignoreUnknown = true)
     private record CuratedHospital(
@@ -287,9 +286,7 @@ public class HospitalCuratedSeedService {
             String match,
             String district,
             String address,
-            String phone,
-            String openHours,
-            String specialties
+            String phone
     ) {
     }
 

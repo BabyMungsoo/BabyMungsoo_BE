@@ -41,10 +41,6 @@ public class Hospital {
 
     private String openHours;
 
-    // 주요 진료 분야. "24시 응급, CT/MRI, 정형외과" 처럼 쉼표로 이어진 문자열.
-    // 카카오가 주지 않는 값이라 큐레이션 목록으로만 채워지고, 없으면 null.
-    private String specialties;
-
     // 이 행을 채운 큐레이션 항목의 이름(hospitals-24h-*.json 의 name). 나중에 검색어를 고쳐
     // 다른 장소로 매칭되면, 같은 키로 채워졌던 이전 행을 찾아 되돌리기 위한 연결 고리다.
     @Column(unique = true)
@@ -73,18 +69,16 @@ public class Hospital {
     }
 
     /**
-     * 큐레이션 목록(수기로 확인한 24시간 병원)의 값을 덮어쓴다.
+     * 큐레이션 목록(수기로 확인한 24시간 병원)에 있는 병원으로 표시한다.
      *
-     * <p>{@link #markOpen24Hours} 와 같이 24시간으로 표시하면서, 카카오가 주지 않는
-     * 운영시간·진료 분야까지 함께 채운다. 전화는 카카오 값이 비어 있을 때만 목록 값을 쓴다 —
-     * 카카오 쪽이 더 자주 갱신되기 때문이다.
+     * <p>{@link #markOpen24Hours} 와 같이 24시간으로 표시하고, 어느 항목이 채웠는지 curatedKey 로 남긴다.
+     * 전화는 카카오 값이 비어 있을 때만 목록 값을 쓴다 — 카카오 쪽이 더 자주 갱신되기 때문이다.
+     * 운영시간·진료분야 같은 문구는 검증할 수 없어 목록에 두지 않고, 예전 목록이 넣어 둔 문구도 지운다.
      */
-    public void applyCurated(String curatedKey, String openHours, String specialties,
-                             String fallbackPhone, LocalDateTime lastUpdated) {
+    public void applyCurated(String curatedKey, String fallbackPhone, LocalDateTime lastUpdated) {
         this.curatedKey = curatedKey;
         this.is24hour = true;
-        this.openHours = openHours;
-        this.specialties = specialties;
+        this.openHours = null;
         if (isMissingPhone() && fallbackPhone != null && !fallbackPhone.isBlank()) {
             this.phone = fallbackPhone;
         }
@@ -100,8 +94,6 @@ public class Hospital {
     public void clearCurated(boolean open24HoursByName, LocalDateTime lastUpdated) {
         this.curatedKey = null;
         this.is24hour = open24HoursByName;
-        this.openHours = null;
-        this.specialties = null;
         this.lastUpdated = lastUpdated;
     }
 
