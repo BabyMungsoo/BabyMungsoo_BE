@@ -21,6 +21,9 @@ public interface HospitalRepository extends JpaRepository<Hospital, Long> {
     // 시드 재실행 시 멱등 처리를 위한 카카오 장소 ID 조회
     Optional<Hospital> findByKakaoPlaceId(String kakaoPlaceId);
 
+    // 큐레이션 항목이 이전에 채웠던 행. 검색어가 바뀌어 다른 장소로 옮겨 가면 이 행을 되돌린다.
+    Optional<Hospital> findByCuratedKey(String curatedKey);
+
     @Query("SELECT h FROM Hospital h WHERE " +
             "h.latitude BETWEEN :minLat AND :maxLat AND " +
             "h.longitude BETWEEN :minLng AND :maxLng")
