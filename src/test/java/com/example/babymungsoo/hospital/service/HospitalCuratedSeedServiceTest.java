@@ -54,14 +54,14 @@ class HospitalCuratedSeedServiceTest {
     }
 
     @Test
-    @DisplayName("큐레이션 파일의 병원 7곳을 전부 읽는다")
+    @DisplayName("큐레이션 파일의 병원 17곳을 전부 읽는다")
     void loadsEveryCuratedEntry() {
         when(kakaoLocalClient.searchByName(anyString())).thenReturn(List.of());
 
         CuratedSeedResult result = service.seedCurated();
 
-        assertThat(result.total()).isEqualTo(7);
-        assertThat(result.skippedNames()).hasSize(7);
+        assertThat(result.total()).isEqualTo(17);
+        assertThat(result.skippedNames()).hasSize(17);
         assertThat(result.matched()).isEmpty();
     }
 
@@ -218,7 +218,7 @@ class HospitalCuratedSeedServiceTest {
         CuratedSeedResult result = service.seedCurated();
 
         assertThat(result.skippedNames()).contains("N동물의료센터 노원점");
-        assertThat(result.total()).isEqualTo(7);
+        assertThat(result.total()).isEqualTo(17);
     }
 
     private static Document doc(String id, String name, String roadAddress, String phone) {
