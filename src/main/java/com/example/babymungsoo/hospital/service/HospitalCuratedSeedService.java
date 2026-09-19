@@ -73,17 +73,18 @@ public class HospitalCuratedSeedService {
         int created = 0;
         int updated = 0;
         List<MatchedHospital> matched = new ArrayList<>();
-        List<String> skippedNames = new ArrayList<>();
+        List<SkippedHospital> skipped = new ArrayList<>();
         // 한 번의 실행에서 두 항목이 같은 장소를 가리키면 뒤의 것은 오매칭이다 (지점 다른 체인점 등)
         Set<String> claimedPlaceIds = new HashSet<>();
         LocalDateTime now = LocalDateTime.now();
 
         for (CuratedFile file : loadFiles()) {
             for (CuratedHospital entry : file.hospitals()) {
-                KakaoKeywordResponse.Document doc = resolve(entry, file.region(), claimedPlaceIds);
+                Resolution resolution = resolve(entry, file.region(), claimedPlaceIds);
+                KakaoKeywordResponse.Document doc = resolution.document();
                 if (doc == null) {
                     revertPreviousMatch(entry, null, now);
-                    skippedNames.add(entry.name());
+                    skipped.add(new SkippedHospital(entry.name(), entry.keyword(), resolution.candidates()));
                     continue;
                 }
                 claimedPlaceIds.add(doc.id());
@@ -121,12 +122,13 @@ public class HospitalCuratedSeedService {
             }
         }
 
-        CuratedSeedResult result =
-                new CuratedSeedResult(matched.size() + skippedNames.size(), created, updated, matched, skippedNames);
+        List<String> skippedNames = skipped.stream().map(SkippedHospital::curatedName).toList();
+        CuratedSeedResult result = new CuratedSeedResult(
+                matched.size() + skipped.size(), created, updated, matched, skippedNames, skipped);
         log.info("24시간 병원 큐레이션 반영 완료 - total={}, created={}, updated={}, skipped={}",
-                result.total(), created, updated, skippedNames.size());
-        if (!skippedNames.isEmpty()) {
-            log.warn("카카오에서 찾지 못해 건너뛴 병원 {}건: {}", skippedNames.size(), skippedNames);
+                result.total(), created, updated, skipped.size());
+        if (!skipped.isEmpty()) {
+            log.warn("카카오에서 찾지 못해 건너뛴 병원 {}건: {}", skipped.size(), skippedNames);
         }
         return result;
     }
@@ -155,7 +157,7 @@ public class HospitalCuratedSeedService {
      * 그런 후보가 여럿이면 출처의 구와 주소가 맞는 쪽을, 없으면 첫 번째를 고른다.
      * 이번 실행에서 이미 다른 항목이 가져간 장소는 제외한다.
      */
-    private KakaoKeywordResponse.Document resolve(CuratedHospital entry, String region, Set<String> claimed) {
+    private Resolution resolve(CuratedHospital entry, String region, Set<String> claimed) {
         List<KakaoKeywordResponse.Document> candidates;
         try {
             candidates = kakaoLocalClient.searchByName(entry.keyword());
@@ -165,8 +167,13 @@ public class HospitalCuratedSeedService {
                 throw e;
             }
             log.warn("카카오 검색 실패 - {}: {}", entry.name(), e.getMessage());
-            return null;
+            return Resolution.none(List.of("(카카오 호출 실패: " + e.getMessage() + ")"));
         }
+
+        // 건너뛰게 되면 이 목록을 결과에 실어 보낸다 — 검색어(keyword)나 match 를 어떻게 고칠지 여기서 판단한다
+        List<String> candidateLabels = candidates.stream()
+                .map(doc -> doc.placeName() + " | " + doc.bestAddress() + " | " + doc.categoryName())
+                .toList();
 
         String needle = normalizeName(StringUtils.hasText(entry.match()) ? entry.match() : entry.name());
 
@@ -180,17 +187,23 @@ public class HospitalCuratedSeedService {
                 .toList();
 
         if (sameName.isEmpty()) {
-            if (!candidates.isEmpty()) {
-                log.info("큐레이션 '{}' 검색 결과 {}건 중 이름이 맞는 곳이 없습니다: {}", entry.name(), candidates.size(),
-                        candidates.stream().map(KakaoKeywordResponse.Document::placeName).toList());
-            }
-            return null;
+            log.info("큐레이션 '{}' 검색 결과 {}건 중 이름이 맞는 곳이 없습니다: {}",
+                    entry.name(), candidates.size(), candidateLabels);
+            return Resolution.none(candidateLabels);
         }
 
-        return sameName.stream()
+        KakaoKeywordResponse.Document chosen = sameName.stream()
                 .filter(doc -> matchesDistrict(doc, entry.district()))
                 .findFirst()
                 .orElse(sameName.get(0));
+        return new Resolution(chosen, candidateLabels);
+    }
+
+    /** 검색 한 번의 결과. 고른 장소가 없으면 document 가 null 이고 candidates 만 남는다. */
+    private record Resolution(KakaoKeywordResponse.Document document, List<String> candidates) {
+        static Resolution none(List<String> candidates) {
+            return new Resolution(null, candidates);
+        }
     }
 
     /**
@@ -294,15 +307,27 @@ public class HospitalCuratedSeedService {
     }
 
     /**
+     * 건너뛴 병원 하나. 카카오가 무엇을 돌려줬는지 함께 담아, 검색어를 어떻게 고칠지 결과만 보고 정할 수 있게 한다.
+     *
+     * @param curatedName 목록의 상호명
+     * @param keyword     썼던 검색어
+     * @param candidates  카카오 응답 ("상호 | 주소 | 카테고리"). 비어 있으면 검색어 자체가 안 잡힌 것
+     */
+    public record SkippedHospital(String curatedName, String keyword, List<String> candidates) {
+    }
+
+    /**
      * 큐레이션 반영 결과.
      *
      * @param total        목록에 있던 병원 수
      * @param created      새로 저장한 수
      * @param updated      이미 있어 24시간 표시만 덧씌운 수
      * @param matched      매칭된 병원 (카카오 상호·주소 포함 — 오매칭 확인용)
-     * @param skippedNames 카카오에서 찾지 못해 건너뛴 병원 이름
+     * @param skippedNames 카카오에서 찾지 못해 건너뛴 병원 이름 (로그·요약용)
+     * @param skipped      건너뛴 병원과 그때 카카오가 돌려준 후보 (검색어 손볼 때 참고)
      */
     public record CuratedSeedResult(int total, int created, int updated,
-                                    List<MatchedHospital> matched, List<String> skippedNames) {
+                                    List<MatchedHospital> matched, List<String> skippedNames,
+                                    List<SkippedHospital> skipped) {
     }
 }
