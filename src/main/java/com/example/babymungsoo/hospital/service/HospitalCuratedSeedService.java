@@ -5,6 +5,7 @@ import com.example.babymungsoo.global.exception.ErrorCode;
 import com.example.babymungsoo.hospital.client.KakaoLocalClient;
 import com.example.babymungsoo.hospital.client.dto.KakaoKeywordResponse;
 import com.example.babymungsoo.hospital.entity.Hospital;
+import com.example.babymungsoo.hospital.entity.HospitalTag;
 import com.example.babymungsoo.hospital.repository.HospitalRepository;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +20,7 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -101,8 +103,9 @@ public class HospitalCuratedSeedService {
                 }
 
                 var existing = hospitalRepository.findByKakaoPlaceId(doc.id());
+                Set<HospitalTag> tags = entry.tagSet();
                 if (existing.isPresent()) {
-                    existing.get().applyCurated(entry.name(), entry.phone(), now);
+                    existing.get().applyCurated(entry.name(), entry.phone(), tags, now);
                     updated++;
                     continue;
                 }
@@ -117,7 +120,7 @@ public class HospitalCuratedSeedService {
                         .is24hour(true)
                         .lastUpdated(now)
                         .build();
-                hospital.applyCurated(entry.name(), entry.phone(), now);
+                hospital.applyCurated(entry.name(), entry.phone(), tags, now);
                 hospitalRepository.save(hospital);
                 created++;
             }
@@ -278,6 +281,7 @@ public class HospitalCuratedSeedService {
      * @param district    출처에 적힌 구. 같은 이름의 지점이 여럿일 때 고르는 데 쓴다
      * @param address     출처에 적힌 주소. 저장에는 쓰지 않고 사람이 대조할 때 참고한다
      * @param phone       카카오에 전화가 없을 때만 쓰는 대체 전화
+     * @param tags        공식 사이트·기사로 확인한 시설 태그 ({@link HospitalTag} 이름). 없으면 생략
      */
     @JsonIgnoreProperties(ignoreUnknown = true)
     private record CuratedHospital(
@@ -286,8 +290,22 @@ public class HospitalCuratedSeedService {
             String match,
             String district,
             String address,
-            String phone
+            String phone,
+            List<String> tags
     ) {
+        /** 태그 이름을 enum 으로 바꾼다. 모르는 이름은 오타이므로 기동 시 바로 실패시킨다. */
+        Set<HospitalTag> tagSet() {
+            Set<HospitalTag> result = EnumSet.noneOf(HospitalTag.class);
+            for (String tag : tags == null ? List.<String>of() : tags) {
+                try {
+                    result.add(HospitalTag.valueOf(tag));
+                } catch (IllegalArgumentException e) {
+                    throw new IllegalStateException(
+                            "큐레이션 '" + name + "' 의 태그 '" + tag + "' 는 HospitalTag 에 없습니다", e);
+                }
+            }
+            return result;
+        }
     }
 
     /**

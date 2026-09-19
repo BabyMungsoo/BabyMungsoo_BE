@@ -5,6 +5,7 @@ import com.example.babymungsoo.global.exception.ErrorCode;
 import com.example.babymungsoo.hospital.client.KakaoLocalClient;
 import com.example.babymungsoo.hospital.client.dto.KakaoKeywordResponse.Document;
 import com.example.babymungsoo.hospital.entity.Hospital;
+import com.example.babymungsoo.hospital.entity.HospitalTag;
 import com.example.babymungsoo.hospital.repository.HospitalRepository;
 import com.example.babymungsoo.hospital.service.HospitalCuratedSeedService.CuratedSeedResult;
 import com.example.babymungsoo.hospital.service.HospitalCuratedSeedService.MatchedHospital;
@@ -18,6 +19,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.LocalDateTime;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
 
@@ -168,7 +170,7 @@ class HospitalCuratedSeedServiceTest {
         ));
         // 이전 실행에서 구 필터만으로 잘못 들어갔던 행
         Hospital wrong = seededHospital("w-1", "동물메디컬센터W", "02-323-8275");
-        wrong.applyCurated("웨스턴동물의료센터", null, LocalDateTime.now());
+        wrong.applyCurated("웨스턴동물의료센터", null, EnumSet.of(HospitalTag.MRI), LocalDateTime.now());
         // findByCuratedKey 는 항목마다 불리므로 기본은 비어 있게 두고, 문제의 항목만 이전 행을 돌려준다
         when(hospitalRepository.findByCuratedKey(anyString())).thenReturn(Optional.empty());
         when(hospitalRepository.findByCuratedKey("웨스턴동물의료센터")).thenReturn(Optional.of(wrong));
@@ -178,6 +180,7 @@ class HospitalCuratedSeedServiceTest {
 
         assertThat(wrong.getCuratedKey()).isNull();
         assertThat(wrong.getIs24hour()).isFalse();
+        assertThat(wrong.getTags()).isEmpty();
         verify(hospitalRepository).save(any());
     }
 
@@ -194,6 +197,29 @@ class HospitalCuratedSeedServiceTest {
         service.seedCurated();
 
         assertThat(existing.getPhone()).isEqualTo("02-984-0075");
+    }
+
+    @Test
+    @DisplayName("목록의 시설 태그를 붙이고, 이미 있던 태그는 목록 값으로 통째로 바꾼다")
+    void appliesTagsFromCuratedList() {
+        when(kakaoLocalClient.searchByName(anyString())).thenReturn(List.of());
+        when(kakaoLocalClient.searchByName("웨스턴동물의료센터")).thenReturn(List.of(
+                doc("western-1", "웨스턴동물의료센터", "서울 마포구 신촌로 110", "02-701-7580")
+        ));
+        when(kakaoLocalClient.searchByName("N동물의료센터 강북점")).thenReturn(List.of(
+                doc("gb-1", "N동물의료센터 강북점", "서울 강북구 도봉로 104", "02-984-0075")
+        ));
+        Hospital western = seededHospital("western-1", "웨스턴동물의료센터", "02-701-7580");
+        // 목록에는 없는 태그가 이전 실행에서 붙어 있던 경우 — 목록 값으로 덮여야 한다
+        Hospital gangbuk = seededHospital("gb-1", "N동물의료센터 강북점", "02-984-0075");
+        gangbuk.applyCurated("N동물의료센터 강북점", null, EnumSet.of(HospitalTag.MRI), LocalDateTime.now());
+        when(hospitalRepository.findByKakaoPlaceId("western-1")).thenReturn(Optional.of(western));
+        when(hospitalRepository.findByKakaoPlaceId("gb-1")).thenReturn(Optional.of(gangbuk));
+
+        service.seedCurated();
+
+        assertThat(western.getTags()).containsExactlyInAnyOrder(HospitalTag.MRI, HospitalTag.EMERGENCY_CENTER);
+        assertThat(gangbuk.getTags()).isEmpty();
     }
 
     @Test

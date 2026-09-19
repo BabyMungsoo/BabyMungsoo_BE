@@ -2,7 +2,11 @@ package com.example.babymungsoo.hospital.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.BatchSize;
+
 import java.time.LocalDateTime;
+import java.util.EnumSet;
+import java.util.Set;
 
 @Entity
 @Table(name = "hospital")
@@ -46,6 +50,16 @@ public class Hospital {
     @Column(unique = true)
     private String curatedKey;
 
+    // 큐레이션이 확인해 붙인 시설 태그(MRI, 응급센터 등). 목록에 없는 병원은 비어 있다.
+    // 목록 조회가 병원 수백 건을 돌려주므로 EAGER 대신 BatchSize 로 묶어 읽는다.
+    @ElementCollection
+    @CollectionTable(name = "hospital_tag", joinColumns = @JoinColumn(name = "hospital_id"))
+    @Column(name = "tag", nullable = false)
+    @Enumerated(EnumType.STRING)
+    @BatchSize(size = 200)
+    @Builder.Default
+    private Set<HospitalTag> tags = EnumSet.noneOf(HospitalTag.class);
+
     private Float rating;
 
     // 리뷰 개수. 시안의 "4.8 (256)"에서 (256)에 해당. 데이터 확보 전엔 null.
@@ -74,11 +88,15 @@ public class Hospital {
      * <p>{@link #markOpen24Hours} 와 같이 24시간으로 표시하고, 어느 항목이 채웠는지 curatedKey 로 남긴다.
      * 전화는 카카오 값이 비어 있을 때만 목록 값을 쓴다 — 카카오 쪽이 더 자주 갱신되기 때문이다.
      * 운영시간·진료분야 같은 문구는 검증할 수 없어 목록에 두지 않고, 예전 목록이 넣어 둔 문구도 지운다.
+     * 시설 태그는 목록 값으로 통째로 바꾼다 — 목록에서 태그를 뺐으면 DB 에서도 빠져야 한다.
      */
-    public void applyCurated(String curatedKey, String fallbackPhone, LocalDateTime lastUpdated) {
+    public void applyCurated(String curatedKey, String fallbackPhone, Set<HospitalTag> tags,
+                             LocalDateTime lastUpdated) {
         this.curatedKey = curatedKey;
         this.is24hour = true;
         this.openHours = null;
+        this.tags.clear();
+        this.tags.addAll(tags);
         if (isMissingPhone() && fallbackPhone != null && !fallbackPhone.isBlank()) {
             this.phone = fallbackPhone;
         }
@@ -94,6 +112,7 @@ public class Hospital {
     public void clearCurated(boolean open24HoursByName, LocalDateTime lastUpdated) {
         this.curatedKey = null;
         this.is24hour = open24HoursByName;
+        this.tags.clear();
         this.lastUpdated = lastUpdated;
     }
 
