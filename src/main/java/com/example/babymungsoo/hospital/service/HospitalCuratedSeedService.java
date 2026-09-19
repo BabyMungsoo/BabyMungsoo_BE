@@ -100,7 +100,7 @@ public class HospitalCuratedSeedService {
                 var existing = hospitalRepository.findByKakaoPlaceId(doc.id());
                 if (existing.isPresent()) {
                     existing.get().applyCurated(entry.name(), entry.openHours(), entry.specialties(),
-                            entry.features(), entry.phone(), now);
+                            entry.phone(), now);
                     updated++;
                     continue;
                 }
@@ -116,7 +116,7 @@ public class HospitalCuratedSeedService {
                         .lastUpdated(now)
                         .build();
                 hospital.applyCurated(entry.name(), entry.openHours(), entry.specialties(),
-                        entry.features(), entry.phone(), now);
+                        entry.phone(), now);
                 hospitalRepository.save(hospital);
                 created++;
             }
@@ -279,7 +279,6 @@ public class HospitalCuratedSeedService {
      * @param phone       카카오에 전화가 없을 때만 쓰는 대체 전화
      * @param openHours   운영시간 문구
      * @param specialties 주요 진료 분야 (쉼표 구분)
-     * @param features    특징 한 줄 (장비·강점). 출처에 없으면 null
      */
     @JsonIgnoreProperties(ignoreUnknown = true)
     private record CuratedHospital(
@@ -290,8 +289,7 @@ public class HospitalCuratedSeedService {
             String address,
             String phone,
             String openHours,
-            String specialties,
-            String features
+            String specialties
     ) {
     }
 

@@ -19,7 +19,6 @@ public class HospitalResponseDto {
     private Boolean is24hour;
     private String openHours;
     private String specialties;
-    private String features;
     private Float rating;
     private Integer reviewCount;
     private String imageUrl;
@@ -36,7 +35,6 @@ public class HospitalResponseDto {
                 .is24hour(hospital.getIs24hour())
                 .openHours(hospital.getOpenHours())
                 .specialties(hospital.getSpecialties())
-                .features(hospital.getFeatures())
                 .rating(hospital.getRating())
                 .reviewCount(hospital.getReviewCount())
                 .imageUrl(hospital.getImageUrl())

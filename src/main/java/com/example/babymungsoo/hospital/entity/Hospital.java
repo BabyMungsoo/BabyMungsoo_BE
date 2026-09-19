@@ -45,12 +45,6 @@ public class Hospital {
     // 카카오가 주지 않는 값이라 큐레이션 목록으로만 채워지고, 없으면 null.
     private String specialties;
 
-    // 병원 특징 한 줄. "대학병원급 MRI·CT 보유, 분과별 전문의 협진" 처럼 장비·강점을 문장으로 둔다.
-    // MRI 보유 같은 걸 boolean 으로 쪼개지 않는 이유: 출처가 언급 안 한 병원을 '없음'으로
-    // 보여주면 오정보가 된다. 큐레이션 목록으로만 채워지고, 없으면 null.
-    @Column(length = 500)
-    private String features;
-
     // 이 행을 채운 큐레이션 항목의 이름(hospitals-24h-*.json 의 name). 나중에 검색어를 고쳐
     // 다른 장소로 매칭되면, 같은 키로 채워졌던 이전 행을 찾아 되돌리기 위한 연결 고리다.
     @Column(unique = true)
@@ -82,16 +76,15 @@ public class Hospital {
      * 큐레이션 목록(수기로 확인한 24시간 병원)의 값을 덮어쓴다.
      *
      * <p>{@link #markOpen24Hours} 와 같이 24시간으로 표시하면서, 카카오가 주지 않는
-     * 운영시간·진료 분야·특징까지 함께 채운다. 전화는 카카오 값이 비어 있을 때만 목록 값을 쓴다 —
+     * 운영시간·진료 분야까지 함께 채운다. 전화는 카카오 값이 비어 있을 때만 목록 값을 쓴다 —
      * 카카오 쪽이 더 자주 갱신되기 때문이다.
      */
-    public void applyCurated(String curatedKey, String openHours, String specialties, String features,
+    public void applyCurated(String curatedKey, String openHours, String specialties,
                              String fallbackPhone, LocalDateTime lastUpdated) {
         this.curatedKey = curatedKey;
         this.is24hour = true;
         this.openHours = openHours;
         this.specialties = specialties;
-        this.features = features;
         if (isMissingPhone() && fallbackPhone != null && !fallbackPhone.isBlank()) {
             this.phone = fallbackPhone;
         }
@@ -109,7 +102,6 @@ public class Hospital {
         this.is24hour = open24HoursByName;
         this.openHours = null;
         this.specialties = null;
-        this.features = null;
         this.lastUpdated = lastUpdated;
     }
 

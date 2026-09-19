@@ -34,8 +34,8 @@ import static org.mockito.Mockito.when;
  * 카카오 호출과 DB 는 목으로 대체한다. 카카오 키 없이도 매칭 규칙이 검증되어야 한다.
  *
  * 실제 카카오 응답에서 겪은 사례를 그대로 테스트로 둔다:
- *  - '서울동물메디컬센터' 검색에 마포구의 '동물메디컬센터W' 가 먼저 옴 (구만 보면 오매칭)
- *  - '우리동생동물병원' 은 출처가 구로구로 적었지만 실제로는 마포구 (구만 보면 영영 못 찾음)
+ *  - 마포구 병원 검색에 같은 구의 '동물메디컬센터W' 가 먼저 옴 (구만 보면 오매칭)
+ *  - 출처가 구를 틀리게 적은 병원 (구만 보면 영영 못 찾음)
  */
 @ExtendWith(MockitoExtension.class)
 class HospitalCuratedSeedServiceTest {
@@ -54,47 +54,51 @@ class HospitalCuratedSeedServiceTest {
     }
 
     @Test
-    @DisplayName("큐레이션 파일의 병원 15곳을 전부 읽는다")
+    @DisplayName("큐레이션 파일의 병원 7곳을 전부 읽는다")
     void loadsEveryCuratedEntry() {
         when(kakaoLocalClient.searchByName(anyString())).thenReturn(List.of());
 
         CuratedSeedResult result = service.seedCurated();
 
-        assertThat(result.total()).isEqualTo(15);
-        assertThat(result.skippedNames()).hasSize(15);
+        assertThat(result.total()).isEqualTo(7);
+        assertThat(result.skippedNames()).hasSize(7);
         assertThat(result.matched()).isEmpty();
     }
 
     @Test
-    @DisplayName("구만 같고 이름이 다른 병원은 받아들이지 않는다 — 서울동물메디컬센터 ≠ 동물메디컬센터W")
+    @DisplayName("구만 같고 이름이 다른 병원은 받아들이지 않는다 — 웨스턴동물의료센터 ≠ 동물메디컬센터W")
     void rejectsDifferentHospitalInSameDistrict() {
         when(kakaoLocalClient.searchByName(anyString())).thenReturn(List.of());
-        when(kakaoLocalClient.searchByName("서울동물메디컬센터")).thenReturn(List.of(
+        when(kakaoLocalClient.searchByName("웨스턴동물의료센터")).thenReturn(List.of(
                 doc("w-1", "동물메디컬센터W", "서울 마포구 월드컵로 46", "02-323-8275")
         ));
 
         CuratedSeedResult result = service.seedCurated();
 
         verify(hospitalRepository, never()).save(any());
-        assertThat(result.skippedNames()).contains("서울동물메디컬센터 (SAMC)");
+        assertThat(result.skippedNames()).contains("웨스턴동물의료센터");
+        assertThat(result.skipped()).anySatisfy(item -> {
+            assertThat(item.curatedName()).isEqualTo("웨스턴동물의료센터");
+            assertThat(item.candidates()).singleElement().asString().contains("동물메디컬센터W");
+        });
     }
 
     @Test
     @DisplayName("이름이 맞으면 출처의 구가 틀려도 저장하고, 구가 달랐다는 사실을 결과에 남긴다")
     void acceptsNameMatchEvenWhenDistrictIsWrong() {
         when(kakaoLocalClient.searchByName(anyString())).thenReturn(List.of());
-        // 출처는 구로구라고 적었지만 실제 우리동생동물병원은 마포구
-        when(kakaoLocalClient.searchByName("우리동생동물병원")).thenReturn(List.of(
-                doc("mapo-9", "우리동생동물병원", "서울 마포구 월드컵로 1", "02-2068-7582")
+        // 출처는 강서구라고 적었지만 카카오 주소가 양천구로 나오는 경우
+        when(kakaoLocalClient.searchByName("아프리카동물메디컬센터")).thenReturn(List.of(
+                doc("yc-9", "24시아프리카동물메디컬센터", "서울 양천구 남부순환로 1", "02-3663-7975")
         ));
-        when(hospitalRepository.findByKakaoPlaceId("mapo-9")).thenReturn(Optional.empty());
+        when(hospitalRepository.findByKakaoPlaceId("yc-9")).thenReturn(Optional.empty());
 
         CuratedSeedResult result = service.seedCurated();
 
         verify(hospitalRepository).save(any());
         assertThat(result.matched())
                 .extracting(MatchedHospital::curatedName, MatchedHospital::districtMatched)
-                .containsExactly(org.assertj.core.groups.Tuple.tuple("우리동생동물병원", false));
+                .containsExactly(org.assertj.core.groups.Tuple.tuple("아프리카동물메디컬센터", false));
     }
 
     @Test
@@ -120,7 +124,6 @@ class HospitalCuratedSeedServiceTest {
         assertThat(hospital.getIs24hour()).isTrue();
         assertThat(hospital.getOpenHours()).contains("24시간");
         assertThat(hospital.getSpecialties()).contains("CT/MRI");
-        assertThat(hospital.getFeatures()).contains("MRI, CT 보유");
         assertThat(result.created()).isEqualTo(1);
     }
 
@@ -128,14 +131,14 @@ class HospitalCuratedSeedServiceTest {
     @DisplayName("카카오가 '24시'를 빼거나 붙여 적어도 같은 이름으로 본다")
     void normalizesTwentyFourHourPrefix() {
         when(kakaoLocalClient.searchByName(anyString())).thenReturn(List.of());
-        when(kakaoLocalClient.searchByName("라온동물병원 마포")).thenReturn(List.of(
-                doc("raon-1", "24시라온동물병원", "서울 마포구 월드컵북로 151", "02-375-7575")
+        when(kakaoLocalClient.searchByName("센트럴동물메디컬센터")).thenReturn(List.of(
+                doc("central-1", "24시센트럴동물메디컬센터", "서울 성동구 왕십리로 1", "02-3395-7975")
         ));
-        when(hospitalRepository.findByKakaoPlaceId("raon-1")).thenReturn(Optional.empty());
+        when(hospitalRepository.findByKakaoPlaceId("central-1")).thenReturn(Optional.empty());
 
         CuratedSeedResult result = service.seedCurated();
 
-        assertThat(result.skippedNames()).doesNotContain("24시 라온동물병원");
+        assertThat(result.skippedNames()).doesNotContain("24시 센트럴동물메디컬센터");
         assertThat(result.created()).isEqualTo(1);
     }
 
@@ -154,7 +157,8 @@ class HospitalCuratedSeedServiceTest {
         verify(hospitalRepository, never()).save(any());
         assertThat(existing.getIs24hour()).isTrue();
         assertThat(existing.getOpenHours()).contains("24시간");
-        assertThat(existing.getSpecialties()).contains("고난도 수술");
+        assertThat(existing.getSpecialties()).isNotBlank();
+        assertThat(existing.getCuratedKey()).isEqualTo("웨스턴동물의료센터");
         assertThat(result.updated()).isEqualTo(1);
         assertThat(result.created()).isZero();
     }
@@ -163,16 +167,16 @@ class HospitalCuratedSeedServiceTest {
     @DisplayName("검색어를 고쳐 다른 장소로 옮겨 가면, 이전에 잘못 채웠던 행은 되돌린다")
     void revertsPreviouslyCuratedRowWhenMatchMoves() {
         when(kakaoLocalClient.searchByName(anyString())).thenReturn(List.of());
-        when(kakaoLocalClient.searchByName("서울동물메디컬센터")).thenReturn(List.of(
-                doc("samc-1", "서울동물메디컬센터", "서울 마포구 월드컵로 92", "02-336-7585")
+        when(kakaoLocalClient.searchByName("웨스턴동물의료센터")).thenReturn(List.of(
+                doc("western-1", "웨스턴동물의료센터", "서울 마포구 신촌로 110", "02-701-7580")
         ));
         // 이전 실행에서 구 필터만으로 잘못 들어갔던 행
         Hospital wrong = seededHospital("w-1", "동물메디컬센터W", "02-323-8275");
-        wrong.applyCurated("서울동물메디컬센터 (SAMC)", "야간", "야간응급", null, null, LocalDateTime.now());
+        wrong.applyCurated("웨스턴동물의료센터", "야간", "야간응급", null, LocalDateTime.now());
         // findByCuratedKey 는 항목마다 불리므로 기본은 비어 있게 두고, 문제의 항목만 이전 행을 돌려준다
         when(hospitalRepository.findByCuratedKey(anyString())).thenReturn(Optional.empty());
-        when(hospitalRepository.findByCuratedKey("서울동물메디컬센터 (SAMC)")).thenReturn(Optional.of(wrong));
-        when(hospitalRepository.findByKakaoPlaceId("samc-1")).thenReturn(Optional.empty());
+        when(hospitalRepository.findByCuratedKey("웨스턴동물의료센터")).thenReturn(Optional.of(wrong));
+        when(hospitalRepository.findByKakaoPlaceId("western-1")).thenReturn(Optional.empty());
 
         service.seedCurated();
 
@@ -187,15 +191,15 @@ class HospitalCuratedSeedServiceTest {
     @DisplayName("카카오에 전화가 없을 때만 목록의 전화를 쓴다")
     void usesCuratedPhoneOnlyWhenKakaoHasNone() {
         when(kakaoLocalClient.searchByName(anyString())).thenReturn(List.of());
-        when(kakaoLocalClient.searchByName("우리동생동물병원")).thenReturn(List.of(
-                doc("guro-1", "우리동생동물병원", "서울 마포구 월드컵로 1", "")
+        when(kakaoLocalClient.searchByName("N동물의료센터 강북점")).thenReturn(List.of(
+                doc("gb-1", "N동물의료센터 강북점", "서울 강북구 도봉로 104", "")
         ));
-        Hospital existing = seededHospital("guro-1", "우리동생동물병원", "정보 없음");
-        when(hospitalRepository.findByKakaoPlaceId("guro-1")).thenReturn(Optional.of(existing));
+        Hospital existing = seededHospital("gb-1", "N동물의료센터 강북점", "정보 없음");
+        when(hospitalRepository.findByKakaoPlaceId("gb-1")).thenReturn(Optional.of(existing));
 
         service.seedCurated();
 
-        assertThat(existing.getPhone()).isEqualTo("02-2068-7582");
+        assertThat(existing.getPhone()).isEqualTo("02-984-0075");
     }
 
     @Test
@@ -220,7 +224,7 @@ class HospitalCuratedSeedServiceTest {
         CuratedSeedResult result = service.seedCurated();
 
         assertThat(result.skippedNames()).contains("N동물의료센터 노원점");
-        assertThat(result.total()).isEqualTo(15);
+        assertThat(result.total()).isEqualTo(7);
     }
 
     private static Document doc(String id, String name, String roadAddress, String phone) {
