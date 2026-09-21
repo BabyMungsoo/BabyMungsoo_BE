@@ -40,10 +40,14 @@ public class StubTriageQuestionGenerator implements TriageQuestionGenerator {
             return TriageQuestionSet.none();
         }
 
+        // 세 번째는 선택지를 비워 둔다. 모델이 선택지를 못 만든 질문이 자유 입력으로
+        // 내려가는 경로(answerType = TEXT)까지 Stub으로 눌러볼 수 있어야 한다.
         return new TriageQuestionSet(true, List.of(
-                new GeneratedQuestion("[MOCK] 증상이 처음 나타난 것은 언제인가요?"),
-                new GeneratedQuestion("[MOCK] 같은 증상이 몇 번이나 반복됐나요?"),
-                new GeneratedQuestion("[MOCK] 평소와 비교해 기운이 떨어져 보이나요?")
+                new GeneratedQuestion("[MOCK] 증상이 처음 나타난 것은 언제인가요?",
+                        List.of("[MOCK] 1시간 안", "[MOCK] 오늘", "[MOCK] 어제", "[MOCK] 며칠 전부터")),
+                new GeneratedQuestion("[MOCK] 같은 증상이 몇 번이나 반복됐나요?",
+                        List.of("[MOCK] 1번", "[MOCK] 2~3번", "[MOCK] 4번 이상", "[MOCK] 계속 반복돼요")),
+                new GeneratedQuestion("[MOCK] 평소와 비교해 기운이 떨어져 보이나요?", List.of())
         ));
     }
 }

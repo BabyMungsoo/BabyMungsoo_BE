@@ -6,6 +6,7 @@ import com.example.babymungsoo.AI.Dto.ClaudeTriageResult;
 import com.example.babymungsoo.AI.Entity.TriageResult;
 import com.example.babymungsoo.AI.Dto.PetProfile;
 import com.example.babymungsoo.AI.Dto.TriageImage;
+import com.example.babymungsoo.AI.Dto.TriageQuestionSet;
 import com.example.babymungsoo.AI.service.TriageImageLoader;
 import com.example.babymungsoo.AI.service.TriageResultService;
 import com.example.babymungsoo.global.auth.CurrentUserProvider;
@@ -209,24 +210,25 @@ public class TriageService {
 
         List<TriageImage> images = triageImageLoader.load(sessionId);
 
-        List<String> contents;
+        List<TriageQuestionSet.UsableQuestion> generated;
         try {
-            contents = triageQuestionGenerator
+            generated = triageQuestionGenerator
                     .generate(initialSymptom, toPetProfile(pet), images)
-                    .usableContents();
+                    .usableQuestions();
         } catch (RuntimeException e) {
             log.warn("추가 질문 생성 실패 - 질문 없이 진행합니다. sessionId={}, reason={}",
                     sessionId, e.getMessage());
             return TriageQuestionSetResponse.none();
         }
 
-        if (contents.isEmpty()) {
+        if (generated.isEmpty()) {
             return TriageQuestionSetResponse.none();
         }
 
         List<Question> questions = new ArrayList<>();
-        for (int i = 0; i < contents.size(); i++) {
-            questions.add(Question.forSession(sessionId, i + 1, contents.get(i)));
+        for (int i = 0; i < generated.size(); i++) {
+            TriageQuestionSet.UsableQuestion question = generated.get(i);
+            questions.add(Question.forSession(sessionId, i + 1, question.content(), question.options()));
         }
 
         return TriageQuestionSetResponse.from(questionRepository.saveAll(questions));

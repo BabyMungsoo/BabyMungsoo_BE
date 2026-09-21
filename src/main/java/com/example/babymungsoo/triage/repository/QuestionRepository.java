@@ -1,6 +1,7 @@
 package com.example.babymungsoo.triage.repository;
 
 import com.example.babymungsoo.triage.entity.Question;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
@@ -20,7 +21,15 @@ public interface QuestionRepository extends JpaRepository<Question, Long> {
     /** 증상 분류별 마스터 질문. */
     List<Question> findBySymptomCategoryAndSessionIdIsNullOrderByOrderNoAsc(String symptomCategory);
 
-    /** 한 세션을 위해 생성된 질문. 생성된 순서(orderNo)대로 돌려준다. */
+    /**
+     * 한 세션을 위해 생성된 질문. 생성된 순서(orderNo)대로 돌려준다.
+     *
+     * <p>선택지({@code options}, {@code @ElementCollection} 기본 LAZY)를 함께 로딩한다.
+     * {@code TriageService.generateQuestions()}는 외부 호출 때문에 트랜잭션 밖에서 도는데,
+     * 이미 만든 질문을 돌려주는 경로가 여기서 읽은 엔티티를 그대로 DTO로 바꾼다.
+     * 함께 로딩하지 않으면 그 변환에서 지연 로딩에 실패한다.
+     */
+    @EntityGraph(attributePaths = {"options"})
     List<Question> findBySessionIdOrderByOrderNoAsc(Long sessionId);
 
     /**
