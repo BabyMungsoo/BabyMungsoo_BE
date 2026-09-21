@@ -3,6 +3,7 @@ package com.example.babymungsoo.triage.service;
 import com.example.babymungsoo.AI.Client.TriageAnalyzer;
 import com.example.babymungsoo.AI.Client.TriageQuestionGenerator;
 import com.example.babymungsoo.AI.Dto.ClaudeTriageResult;
+import com.example.babymungsoo.AI.Entity.TriageLevel;
 import com.example.babymungsoo.AI.Entity.TriageResult;
 import com.example.babymungsoo.AI.Dto.PetProfile;
 import com.example.babymungsoo.AI.Dto.TriageImage;
@@ -293,9 +294,16 @@ public class TriageService {
                 .neutered(petProfile.neutered())
                 .underlyingDisease(petProfile.underlyingDisease())
                 .level(analyzed.level())
-                .title(analyzed.title())
-                .reason(analyzed.reason())
-                .guide(analyzed.guide())
+                // 결론 문구는 모델 출력이 아니라 등급에서 만든다. 등급과 결론이 어긋날 수 없게 하기 위해서다.
+                .title(analyzed.level().headline())
+                .findings(TriageResult.joinLines(analyzed.findings()))
+                .urgencyReason(analyzed.urgencyReason())
+                // 악화 신호는 "지금은 아니지만 이게 보이면 즉시"라는 조건이라 IMMEDIATE에는 성립하지 않는다.
+                // 프롬프트가 빈 배열을 요구하지만 모델이 어길 수 있어 여기서 확정한다.
+                .escalationSigns(analyzed.level() == TriageLevel.IMMEDIATE
+                        ? null
+                        : TriageResult.joinLines(analyzed.escalationSigns()))
+                .precautions(TriageResult.joinLines(analyzed.precautions()))
                 .rawSymptoms(rawSymptoms)
                 .build();
 
