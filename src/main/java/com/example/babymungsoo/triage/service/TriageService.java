@@ -280,7 +280,8 @@ public class TriageService {
         // 사진은 보조 근거라, 읽지 못한 장이 있어도 로더가 그 장만 빼고 진행한다.
         List<TriageImage> images = triageImageLoader.load(session.getId());
 
-        ClaudeTriageResult analyzed = triageAnalyzer.analyze(rawSymptoms, petProfile, images);
+        // 개수·줄바꿈 같은 형식 규칙은 모델이 어길 수 있어 저장 전에 계약에 맞게 다듬는다.
+        ClaudeTriageResult analyzed = triageAnalyzer.analyze(rawSymptoms, petProfile, images).sanitized();
 
         TriageResult triageResult = TriageResult.builder()
                 .sessionId(session.getId())
@@ -293,9 +294,12 @@ public class TriageService {
                 .neutered(petProfile.neutered())
                 .underlyingDisease(petProfile.underlyingDisease())
                 .level(analyzed.level())
-                .title(analyzed.title())
-                .reason(analyzed.reason())
-                .guide(analyzed.guide())
+                // 결론 문구는 모델 출력이 아니라 등급에서 만든다. 등급과 결론이 어긋날 수 없게 하기 위해서다.
+                .title(analyzed.level().headline())
+                .findings(TriageResult.joinLines(analyzed.findings()))
+                .urgencyReason(analyzed.urgencyReason())
+                .escalationSigns(TriageResult.joinLines(analyzed.escalationSigns()))
+                .precautions(TriageResult.joinLines(analyzed.precautions()))
                 .rawSymptoms(rawSymptoms)
                 .build();
 
