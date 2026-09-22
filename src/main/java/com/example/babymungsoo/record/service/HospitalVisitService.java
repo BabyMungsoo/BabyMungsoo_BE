@@ -41,7 +41,8 @@ public class HospitalVisitService {
 
     @Transactional
     public HospitalVisitResponseDto create(Long recordId, HospitalVisitCreateRequestDto request) {
-        AnalysisRecord record = findOwnedRecord(recordId);
+        // 저장 도중 기록이 지워져 주인 없는 답변이 남지 않도록 기록을 잠그고 읽는다.
+        AnalysisRecord record = findOwnedRecord(recordId, true);
         validate(request);
 
         HospitalVisit visit = HospitalVisit.builder()
@@ -65,9 +66,9 @@ public class HospitalVisitService {
     }
 
     public List<HospitalVisitResponseDto> findByRecord(Long recordId) {
-        findOwnedRecord(recordId);
+        findOwnedRecord(recordId, false);
 
-        return hospitalVisitRepository.findByRecordIdOrderByVisitedAtDescVisitIdDesc(recordId).stream()
+        return hospitalVisitRepository.findByRecordId(recordId).stream()
                 .map(HospitalVisitResponseDto::from)
                 .toList();
     }
@@ -81,6 +82,8 @@ public class HospitalVisitService {
             // 가지 않았다는 답에는 진료 내용을 붙일 수 없다. 다녀왔다면 지우고 다시 남긴다.
             throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
         }
+
+        validateHospitalPatch(request);
 
         visit.update(
                 request.getVisitedAt(),
@@ -147,6 +150,23 @@ public class HospitalVisitService {
     // ----- 내부 헬퍼 -----
 
     /**
+     * 병원을 지우는 수정을 막는다.
+     *
+     * <p>{@code hospitalName}에 빈 문자열을 보내면 "값을 줬다"로 읽혀 기존 {@code hospitalId}가
+     * 지워진다. 그대로 두면 다녀왔다는 기록에 병원이 하나도 없는 상태가 남는데, 생성 때는
+     * 금지한 상태다. 병원을 건드리는 수정이면 결과가 비지 않는지 미리 본다.
+     */
+    private void validateHospitalPatch(HospitalVisitUpdateRequestDto request) {
+        boolean touchesHospital = request.getHospitalId() != null || request.getHospitalName() != null;
+        if (!touchesHospital) {
+            return;
+        }
+        if (request.getHospitalId() == null && !StringUtils.hasText(request.getHospitalName())) {
+            throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+    }
+
+    /**
      * 상태별 필수값을 검증한다.
      *
      * <p>가지 않았다는 답에 진료 내용이 섞이면 집계가 흐려지므로 막는다.
@@ -209,8 +229,13 @@ public class HospitalVisitService {
         visit.applyHospitalName(name);
     }
 
-    private AnalysisRecord findOwnedRecord(Long recordId) {
-        AnalysisRecord record = analysisRecordRepository.findById(recordId)
+    /**
+     * @param lock 쓰기 경로에서만 true. 조회까지 잠그면 읽기가 삭제를 기다리게 된다.
+     */
+    private AnalysisRecord findOwnedRecord(Long recordId, boolean lock) {
+        AnalysisRecord record = (lock
+                ? analysisRecordRepository.findWithLockByRecordId(recordId)
+                : analysisRecordRepository.findById(recordId))
                 .orElseThrow(() -> new CustomException(ErrorCode.RECORD_NOT_FOUND));
 
         // 남의 기록에 답을 붙이지 못하게 막는다. 존재 여부를 노출하지 않도록 권한 없음도 NOT_FOUND 다.

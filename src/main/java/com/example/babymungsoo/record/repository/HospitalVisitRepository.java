@@ -14,11 +14,19 @@ public interface HospitalVisitRepository extends JpaRepository<HospitalVisit, Lo
     /**
      * 한 기록의 방문 답변을 최근 방문일 순으로.
      *
-     * <p>가지 않았다는 답({@code NOT_VISITED})은 {@code visitedAt}이 null이라 뒤로 밀린다.
-     * 처치 태그를 함께 읽는다. 이 엔티티의 유일한 컬렉션이라 fetch join 이 안전하다.
+     * <p>가지 않았다는 답({@code NOT_VISITED})은 {@code visitedAt}이 null이다. PostgreSQL은
+     * {@code DESC}에서 null을 맨 앞에 놓으므로, 파생 쿼리를 그대로 쓰면 안 간 답이 실제 방문보다
+     * 위에 온다. {@code nulls last}를 명시해야 의도대로 뒤로 밀린다.
+     *
+     * <p>처치 태그를 함께 읽는다. 이 엔티티의 유일한 컬렉션이라 fetch join 이 안전하다.
      */
     @EntityGraph(attributePaths = {"treatments"})
-    List<HospitalVisit> findByRecordIdOrderByVisitedAtDescVisitIdDesc(Long recordId);
+    @Query("""
+            select v from HospitalVisit v
+            where v.recordId = :recordId
+            order by v.visitedAt desc nulls last, v.visitId desc
+            """)
+    List<HospitalVisit> findByRecordId(@Param("recordId") Long recordId);
 
     @EntityGraph(attributePaths = {"treatments"})
     Optional<HospitalVisit> findWithTreatmentsByVisitId(Long visitId);

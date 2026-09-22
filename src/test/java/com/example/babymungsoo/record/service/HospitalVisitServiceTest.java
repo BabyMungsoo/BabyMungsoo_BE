@@ -7,6 +7,7 @@ import com.example.babymungsoo.hospital.entity.Hospital;
 import com.example.babymungsoo.hospital.repository.HospitalRepository;
 import com.example.babymungsoo.record.dto.HospitalVisitCreateRequestDto;
 import com.example.babymungsoo.record.dto.HospitalVisitResponseDto;
+import com.example.babymungsoo.record.dto.HospitalVisitUpdateRequestDto;
 import com.example.babymungsoo.record.entity.AnalysisRecord;
 import com.example.babymungsoo.record.entity.HospitalVisit;
 import com.example.babymungsoo.record.entity.NotVisitedReason;
@@ -67,6 +68,8 @@ class HospitalVisitServiceTest {
 
         when(currentUserProvider.getCurrentUserId()).thenReturn(OWNER_ID);
         when(analysisRecordRepository.findById(RECORD_ID)).thenReturn(Optional.of(record(OWNER_ID)));
+        when(analysisRecordRepository.findWithLockByRecordId(RECORD_ID))
+                .thenReturn(Optional.of(record(OWNER_ID)));
         when(hospitalVisitRepository.save(any(HospitalVisit.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
     }
@@ -149,7 +152,8 @@ class HospitalVisitServiceTest {
     @Test
     @DisplayName("남의 기록에는 답을 붙일 수 없다 — 존재를 노출하지 않도록 NOT_FOUND")
     void rejectsOtherUsersRecord() {
-        when(analysisRecordRepository.findById(RECORD_ID)).thenReturn(Optional.of(record(999L)));
+        when(analysisRecordRepository.findWithLockByRecordId(RECORD_ID))
+                .thenReturn(Optional.of(record(999L)));
 
         HospitalVisitCreateRequestDto request = request(VisitStatus.NOT_VISITED);
         set(request, "notVisitedReason", NotVisitedReason.OTHER);
@@ -157,6 +161,28 @@ class HospitalVisitServiceTest {
         assertThatThrownBy(() -> service.create(RECORD_ID, request))
                 .isInstanceOf(CustomException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.RECORD_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("수정으로 병원을 비울 수 없다 — 빈 문자열을 보내면 거부한다")
+    void rejectsBlankHospitalOnPatch() {
+        HospitalVisit visit = HospitalVisit.builder()
+                .recordId(RECORD_ID)
+                .userId(OWNER_ID)
+                .visitStatus(VisitStatus.VISITED)
+                .visitedAt(LocalDate.of(2026, 9, 22))
+                .hospitalId(17L)
+                .hospitalName("OO동물의료센터")
+                .build();
+        when(hospitalVisitRepository.findWithTreatmentsByVisitId(1L)).thenReturn(Optional.of(visit));
+
+        HospitalVisitUpdateRequestDto request = new HospitalVisitUpdateRequestDto();
+        set(request, "hospitalName", "  ");
+
+        assertThatThrownBy(() -> service.update(1L, request))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_INPUT_VALUE);
+        assertThat(visit.getHospitalName()).isEqualTo("OO동물의료센터");
     }
 
     // ----- 헬퍼 -----
