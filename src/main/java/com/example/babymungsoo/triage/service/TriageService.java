@@ -3,7 +3,6 @@ package com.example.babymungsoo.triage.service;
 import com.example.babymungsoo.AI.Client.TriageAnalyzer;
 import com.example.babymungsoo.AI.Client.TriageQuestionGenerator;
 import com.example.babymungsoo.AI.Dto.ClaudeTriageResult;
-import com.example.babymungsoo.AI.Entity.TriageLevel;
 import com.example.babymungsoo.AI.Entity.TriageResult;
 import com.example.babymungsoo.AI.Dto.PetProfile;
 import com.example.babymungsoo.AI.Dto.TriageImage;
@@ -281,7 +280,8 @@ public class TriageService {
         // 사진은 보조 근거라, 읽지 못한 장이 있어도 로더가 그 장만 빼고 진행한다.
         List<TriageImage> images = triageImageLoader.load(session.getId());
 
-        ClaudeTriageResult analyzed = triageAnalyzer.analyze(rawSymptoms, petProfile, images);
+        // 개수·줄바꿈 같은 형식 규칙은 모델이 어길 수 있어 저장 전에 계약에 맞게 다듬는다.
+        ClaudeTriageResult analyzed = triageAnalyzer.analyze(rawSymptoms, petProfile, images).sanitized();
 
         TriageResult triageResult = TriageResult.builder()
                 .sessionId(session.getId())
@@ -298,11 +298,7 @@ public class TriageService {
                 .title(analyzed.level().headline())
                 .findings(TriageResult.joinLines(analyzed.findings()))
                 .urgencyReason(analyzed.urgencyReason())
-                // 악화 신호는 "지금은 아니지만 이게 보이면 즉시"라는 조건이라 IMMEDIATE에는 성립하지 않는다.
-                // 프롬프트가 빈 배열을 요구하지만 모델이 어길 수 있어 여기서 확정한다.
-                .escalationSigns(analyzed.level() == TriageLevel.IMMEDIATE
-                        ? null
-                        : TriageResult.joinLines(analyzed.escalationSigns()))
+                .escalationSigns(TriageResult.joinLines(analyzed.escalationSigns()))
                 .precautions(TriageResult.joinLines(analyzed.precautions()))
                 .rawSymptoms(rawSymptoms)
                 .build();

@@ -4,7 +4,9 @@ import com.example.babymungsoo.AI.Entity.TriageLevel;
 import com.fasterxml.jackson.annotation.JsonClassDescription;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Claude가 반환하는 응급도 분석 결과.
@@ -46,4 +48,65 @@ public record ClaudeTriageResult(
                 + "그 밖의 투약·처치 지시, 병명 확정, 검사 항목 특정은 진료행위이므로 포함하지 않는다")
         List<String> precautions
 ) {
+
+    /** 소견·악화 신호 상한. 프롬프트 규칙과 같은 값이다. */
+    public static final int MAX_FINDINGS = 4;
+    public static final int MAX_ESCALATION_SIGNS = 4;
+    public static final int MAX_PRECAUTIONS = 2;
+
+    /**
+     * 저장하기 전에 모델 출력을 계약에 맞게 다듬는다.
+     *
+     * <p>개수·형식 규칙은 프롬프트와 스키마 설명에 적혀 있을 뿐 모델이 반드시 지키지는 않는다.
+     * 실호출 검증에서 20건 중 1건이 소견을 5개 냈고, IMMEDIATE에 악화 신호를 붙인 경우도 있었다.
+     * 여기서 잡지 않으면 그대로 저장돼 응답이 계약 밖으로 나간다.
+     *
+     * <ul>
+     *   <li>공백 정리, 빈 항목·중복 제거</li>
+     *   <li>항목 안의 줄바꿈은 공백으로 — 목록을 줄바꿈으로 결합해 저장하므로,
+     *       항목에 줄바꿈이 있으면 읽을 때 두 항목으로 쪼개진다</li>
+     *   <li>상한에서 절단. 뒤쪽 항목을 버린다</li>
+     *   <li>IMMEDIATE면 악화 신호를 비운다. "지금은 아니지만 이게 보이면 즉시"라는 조건이라
+     *       즉시 내원에는 성립하지 않는다</li>
+     * </ul>
+     *
+     * <p>글자 수 상한(40자)은 자르지 않는다. 문장 중간이 잘리면 뜻이 깨지고, 실측에서 넘긴 적이 없다.
+     * 최소 개수(소견 2개)도 강제하지 않는다. 없는 소견을 만들어 낼 수는 없다.
+     */
+    public ClaudeTriageResult sanitized() {
+        return new ClaudeTriageResult(
+                level,
+                cleanList(findings, MAX_FINDINGS),
+                cleanText(urgencyReason),
+                level == TriageLevel.IMMEDIATE ? List.of() : cleanList(escalationSigns, MAX_ESCALATION_SIGNS),
+                cleanList(precautions, MAX_PRECAUTIONS)
+        );
+    }
+
+    private static List<String> cleanList(List<String> raw, int max) {
+        if (raw == null) {
+            return List.of();
+        }
+        Set<String> distinct = new LinkedHashSet<>();
+        for (String item : raw) {
+            String cleaned = cleanText(item);
+            if (cleaned == null) {
+                continue;
+            }
+            distinct.add(cleaned);
+            if (distinct.size() == max) {
+                break;
+            }
+        }
+        return List.copyOf(distinct);
+    }
+
+    /** 앞뒤 공백을 걷고 안쪽 줄바꿈·연속 공백을 한 칸으로 만든다. 비면 null이다. */
+    private static String cleanText(String value) {
+        if (value == null) {
+            return null;
+        }
+        String cleaned = value.replaceAll("\\s+", " ").strip();
+        return cleaned.isEmpty() ? null : cleaned;
+    }
 }
