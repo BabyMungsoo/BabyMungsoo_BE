@@ -5,6 +5,7 @@ import com.example.babymungsoo.global.exception.ErrorCode;
 import com.example.babymungsoo.record.dto.AnalysisRecordUpdateRequestDto;
 import com.example.babymungsoo.record.entity.AnalysisRecord;
 import com.example.babymungsoo.record.repository.AnalysisRecordRepository;
+import com.example.babymungsoo.record.repository.HospitalVisitRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,6 +18,7 @@ import java.util.List;
 public class AnalysisRecordService {
 
     private final AnalysisRecordRepository analysisRecordRepository;
+    private final HospitalVisitRepository hospitalVisitRepository;
 
     @Transactional
     public AnalysisRecord createRecord(AnalysisRecord record) {
@@ -50,6 +52,9 @@ public class AnalysisRecordService {
     public void deleteRecord(Long recordId) {
         AnalysisRecord record = analysisRecordRepository.findById(recordId)
                 .orElseThrow(() -> new CustomException(ErrorCode.RECORD_NOT_FOUND));
+
+        // 기록이 사라지면 거기 달린 팔로우업 답변도 함께 지운다. 남으면 주인 없는 행이 된다.
+        hospitalVisitRepository.deleteByRecordId(recordId);
         analysisRecordRepository.delete(record);
     }
 }

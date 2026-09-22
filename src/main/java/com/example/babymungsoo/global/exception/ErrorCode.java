@@ -24,6 +24,7 @@ public enum ErrorCode {
     KAKAO_API_KEY_NOT_CONFIGURED(HttpStatus.INTERNAL_SERVER_ERROR, "카카오 API 설정이 완료되지 않았습니다."),
     KAKAO_API_ERROR(HttpStatus.BAD_GATEWAY, "카카오 장소 검색 요청에 실패했습니다."),
     RECORD_NOT_FOUND(HttpStatus.NOT_FOUND, "분석 기록을 찾을 수 없습니다."),
+    VISIT_NOT_FOUND(HttpStatus.NOT_FOUND, "병원 방문 기록을 찾을 수 없습니다."),
     REPORT_NOT_FOUND(HttpStatus.NOT_FOUND, "리포트를 찾을 수 없습니다."),
     REPORT_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 해당 기록에 대한 리포트가 존재합니다."),
 
