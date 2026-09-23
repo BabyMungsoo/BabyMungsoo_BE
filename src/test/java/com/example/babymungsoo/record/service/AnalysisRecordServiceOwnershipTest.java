@@ -7,6 +7,7 @@ import com.example.babymungsoo.record.dto.AnalysisRecordUpdateRequestDto;
 import com.example.babymungsoo.record.entity.AnalysisRecord;
 import com.example.babymungsoo.record.repository.AnalysisRecordRepository;
 import com.example.babymungsoo.record.repository.HospitalVisitRepository;
+import com.example.babymungsoo.report.repository.ReportRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -40,6 +41,9 @@ class AnalysisRecordServiceOwnershipTest {
 
     @Mock
     HospitalVisitRepository hospitalVisitRepository;
+
+    @Mock
+    ReportRepository reportRepository;
 
     @Mock
     CurrentUserProvider currentUserProvider;
@@ -92,6 +96,22 @@ class AnalysisRecordServiceOwnershipTest {
 
         verify(analysisRecordRepository, never()).delete(any());
         verify(hospitalVisitRepository, never()).deleteByRecordId(anyLong());
+        verify(reportRepository, never()).deleteByRecordId(anyLong());
+    }
+
+    @Test
+    @DisplayName("내 기록을 지우면 팔로우업 답변과 리포트도 함께 지운다")
+    void deleteAlsoRemovesVisitsAndReport() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(ME);
+        AnalysisRecord mine = record(3L, ME);
+        when(analysisRecordRepository.findWithLockByRecordId(3L)).thenReturn(Optional.of(mine));
+
+        service.deleteRecord(3L);
+
+        verify(hospitalVisitRepository).deleteByRecordId(3L);
+        // 리포트를 남기면 주인을 확인할 기록이 없어져, 조회도 삭제도 못 하는 행이 내용을 담은 채 남는다
+        verify(reportRepository).deleteByRecordId(3L);
+        verify(analysisRecordRepository).delete(mine);
     }
 
     @Test
