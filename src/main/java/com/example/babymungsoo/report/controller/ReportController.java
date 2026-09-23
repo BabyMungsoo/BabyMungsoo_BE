@@ -60,4 +60,10 @@ public class ReportController {
                 .map(ReportResponseDto::from);
         return ResponseEntity.ok(reports);
     }
+    /** 잘못 보낸 리포트 회수. 본인 것만 지울 수 있다. */
+    @DeleteMapping("/{reportId}")
+    public ResponseEntity<Void> deleteReport(@PathVariable Long reportId) {
+        reportService.deleteReport(reportId);
+        return ResponseEntity.noContent().build();
+    }
 }

@@ -7,6 +7,7 @@ import com.example.babymungsoo.record.dto.AnalysisRecordUpdateRequestDto;
 import com.example.babymungsoo.record.entity.AnalysisRecord;
 import com.example.babymungsoo.record.repository.AnalysisRecordRepository;
 import com.example.babymungsoo.record.repository.HospitalVisitRepository;
+import com.example.babymungsoo.report.repository.ReportRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,6 +22,7 @@ public class AnalysisRecordService {
 
     private final AnalysisRecordRepository analysisRecordRepository;
     private final HospitalVisitRepository hospitalVisitRepository;
+    private final ReportRepository reportRepository;
     private final CurrentUserProvider currentUserProvider;
 
     /**
@@ -65,8 +67,10 @@ public class AnalysisRecordService {
         AnalysisRecord record = requireOwned(analysisRecordRepository.findWithLockByRecordId(recordId)
                 .orElseThrow(() -> new CustomException(ErrorCode.RECORD_NOT_FOUND)));
 
-        // 기록이 사라지면 거기 달린 팔로우업 답변도 함께 지운다.
+        // 기록이 사라지면 거기 달린 팔로우업 답변과 리포트도 함께 지운다.
+        // 리포트를 남기면 주인을 확인할 기록이 없어져, 조회도 삭제도 못 하는 행이 내용을 담은 채 남는다.
         hospitalVisitRepository.deleteByRecordId(recordId);
+        reportRepository.deleteByRecordId(recordId);
         analysisRecordRepository.delete(record);
     }
 
