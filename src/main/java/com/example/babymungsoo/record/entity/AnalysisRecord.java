@@ -62,6 +62,14 @@ public class AnalysisRecord {
      * 부분 수정. null 로 들어온 필드는 건드리지 않습니다.
      * 단 suspectedDisease 는 nullable 컬럼이라, null 로 보내면 값을 지우는 것으로 봅니다.
      */
+    /**
+     * 주인을 토큰의 사용자로 확정한다. 요청 DTO 에는 userId 가 없고 서비스가 여기서 채운다 —
+     * 클라이언트가 보낸 값을 그대로 쓰면 남의 이름으로 기록을 만들 수 있다.
+     */
+    public void assignOwner(Long userId) {
+        this.userId = userId;
+    }
+
     public void update(String symptomText, String emergencyLevel, String suspectedDisease) {
         if (symptomText != null && !symptomText.isBlank()) {
             this.symptomText = symptomText;

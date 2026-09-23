@@ -36,10 +36,10 @@ public class AnalysisRecordController {
     }
 
 
+    /** 로그인한 사용자의 기록만 돌려준다. 조회 대상을 쿼리로 받지 않는다. */
     @GetMapping
-    public ResponseEntity<List<AnalysisRecordResponseDto>> getAllRecords(
-            @RequestParam Long userId) {
-        List<AnalysisRecord> found = analysisRecordService.getAllRecords(userId);
+    public ResponseEntity<List<AnalysisRecordResponseDto>> getAllRecords() {
+        List<AnalysisRecord> found = analysisRecordService.getAllRecords();
 
         // 기록마다 방문을 조회하면 N+1이라 한 번에 세어 붙인다.
         Map<Long, VisitSummary> summaries = hospitalVisitService.summarize(
