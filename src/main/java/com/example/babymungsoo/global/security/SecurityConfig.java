@@ -55,6 +55,12 @@ public class SecurityConfig {
                                 )
                                 .permitAll()
 
+                                // 관리자 전용. 시드는 카카오를 수백 번 호출하고 병원 DB 를 통째로
+                                // 갱신하므로, 로그인했다는 것만으로 열어 두면 아무나 쿼터를 태우고
+                                // 데이터를 흔들 수 있다. 서비스 쪽 validateAdmin 과 이중으로 막는다.
+                                .requestMatchers("/api/v1/admin/**")
+                                .hasRole("ADMIN")
+
                                 .anyRequest()
                                 .authenticated()
                 )
