@@ -23,7 +23,6 @@ public record PetCreateRequest(
         String breed,
 
         @Schema(description = "나이", example = "5")
-        @NotNull(message = "나이는 필수입니다.")
         @PositiveOrZero(message = "나이는 0 이상이어야 합니다.")
         Integer age,
 

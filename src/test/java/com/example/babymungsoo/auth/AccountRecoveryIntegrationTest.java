@@ -60,11 +60,11 @@ class AccountRecoveryIntegrationTest {
         String token = requestToken();
         User issued = users.findByEmail("member@example.com").orElseThrow();
         assertThat(issued.getPasswordResetHash()).hasSize(64).isNotEqualTo(token);
-        confirm(token, "newPassword1", 204);
+        confirm(token, "newPassword1!", 204);
         User updated = users.findByEmail("member@example.com").orElseThrow();
-        assertThat(encoder.matches("newPassword1", updated.getPassword())).isTrue();
+        assertThat(encoder.matches("newPassword1!", updated.getPassword())).isTrue();
         assertThat(updated.getPasswordResetHash()).isNull();
-        confirm(token, "anotherPassword1", 400);
+        confirm(token, "anotherPassword1!", 400);
         mvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"member@example.com\",\"password\":\"oldPassword1\"}"))
                 .andExpect(status().isUnauthorized());
