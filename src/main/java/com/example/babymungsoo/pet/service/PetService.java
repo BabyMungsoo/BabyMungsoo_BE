@@ -35,6 +35,7 @@ public class PetService {
                 .name(request.name().trim())
                 .breed(request.breed().trim())
                 .age(request.age())
+                .birthDate(request.birthDate())
                 .gender(request.gender())
                 .weight(request.weight())
                 .neutered(request.isNeutered())
@@ -85,6 +86,7 @@ public class PetService {
                 request.profileImage()
         );
 
+        pet.updateBirthDate(request.birthDate(), request.age());
         return PetResponse.from(pet);
     }
 

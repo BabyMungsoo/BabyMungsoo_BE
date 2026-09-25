@@ -7,6 +7,8 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.PastOrPresent;
+import java.time.LocalDate;
 
 public record PetCreateRequest(
 
@@ -24,6 +26,10 @@ public record PetCreateRequest(
         @NotNull(message = "나이는 필수입니다.")
         @PositiveOrZero(message = "나이는 0 이상이어야 합니다.")
         Integer age,
+
+        @Schema(description = "생년월일. 생년월일을 보내면 나이는 자동 계산됩니다.", example = "2026-03-25")
+        @PastOrPresent(message = "생년월일은 오늘 또는 이전 날짜여야 합니다.")
+        LocalDate birthDate,
 
         @Schema(description = "성별", example = "MALE")
         @NotNull(message = "성별은 필수입니다.")

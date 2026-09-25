@@ -13,6 +13,8 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
+import java.time.LocalDate;
+import java.time.Period;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -46,6 +48,9 @@ public class Pet {
     @Column(name = "dog_age", nullable = false)
     private Integer age;
 
+    @Column(name = "dog_birth_date")
+    private LocalDate birthDate;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "dog_gender", nullable = false, length = 10)
     private PetGender gender;
@@ -65,6 +70,27 @@ public class Pet {
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    public Integer getAge() {
+        return birthDate == null ? age : Period.between(birthDate, LocalDate.now()).getYears();
+    }
+
+    public String getAgeLabel() {
+        if (birthDate == null) return age == 0 ? "1세 미만" : age + "세";
+        Period elapsed = Period.between(birthDate, LocalDate.now());
+        if (elapsed.getYears() > 0) return elapsed.getYears() + "세";
+        return elapsed.getMonths() == 0 ? "1개월 미만" : elapsed.getMonths() + "개월";
+    }
+
+    // An explicit age selects manual mode. Unrelated PATCH requests preserve the birthday.
+    public void updateBirthDate(LocalDate birthDate, Integer manualAge) {
+        if (birthDate != null) {
+            this.birthDate = birthDate;
+            this.age = Period.between(birthDate, LocalDate.now()).getYears();
+        } else if (manualAge != null) {
+            this.birthDate = null;
+        }
+    }
 
     public void update(
             String name,

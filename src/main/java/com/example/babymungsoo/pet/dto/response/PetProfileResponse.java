@@ -1,6 +1,7 @@
 package com.example.babymungsoo.pet.dto.response;
 
 import com.example.babymungsoo.pet.entity.Pet;
+import java.time.LocalDate;
 import com.example.babymungsoo.pet.entity.PetGender;
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -17,6 +18,9 @@ public record PetProfileResponse(
 
         @Schema(description = "나이", example = "5")
         Integer age,
+
+        @Schema(description = "생년월일 (직접 나이 입력 시 null)")
+        LocalDate birthDate,
 
         @Schema(description = "성별", example = "MALE")
         PetGender gender,
@@ -43,6 +47,7 @@ public record PetProfileResponse(
                 pet.getName(),
                 pet.getBreed(),
                 pet.getAge(),
+                pet.getBirthDate(),
                 pet.getGender(),
                 pet.getWeight(),
                 pet.isNeutered(),
@@ -71,9 +76,9 @@ public record PetProfileResponse(
                         : pet.getUnderlyingDisease();
 
         return String.format(
-                "품종: %s, 나이: %d세, 성별: %s, 체중: %s, 중성화 여부: %s, 기저질환: %s",
+                "품종: %s, 나이: %s, 성별: %s, 체중: %s, 중성화 여부: %s, 기저질환: %s",
                 pet.getBreed(),
-                pet.getAge(),
+                pet.getAgeLabel(),
                 gender,
                 weight,
                 neutered,
