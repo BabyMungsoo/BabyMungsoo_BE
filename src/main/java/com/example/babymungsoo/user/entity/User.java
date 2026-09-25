@@ -9,6 +9,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
+import java.time.Instant;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -52,4 +53,23 @@ public class User {
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    @Column(name = "password_reset_hash", length = 64, unique = true)
+    private String passwordResetHash;
+
+    private Instant passwordResetExpiresAt;
+
+    private Instant passwordResetRequestedAt;
+
+    public void issuePasswordReset(String hash, Instant now) {
+        this.passwordResetHash = hash;
+        this.passwordResetExpiresAt = now.plusSeconds(900);
+        this.passwordResetRequestedAt = now;
+    }
+
+    public void resetPassword(String encodedPassword) {
+        this.password = encodedPassword;
+        this.passwordResetHash = null;
+        this.passwordResetExpiresAt = null;
+    }
 }

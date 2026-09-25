@@ -4,6 +4,9 @@ import org.springframework.http.HttpStatus;
 
 public enum ErrorCode {
 
+    INVALID_PASSWORD_RESET_TOKEN(HttpStatus.BAD_REQUEST, "재설정 토큰이 유효하지 않거나 만료되었습니다."),
+    RECOVERY_MAIL_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "계정 복구 메일을 발송할 수 없습니다."),
+
     INVALID_INPUT_VALUE(HttpStatus.BAD_REQUEST, "잘못된 입력값입니다."),
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."),
     PET_NOT_FOUND(HttpStatus.NOT_FOUND, "반려동물을 찾을 수 없습니다."),
