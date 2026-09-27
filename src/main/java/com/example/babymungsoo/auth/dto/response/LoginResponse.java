@@ -7,7 +7,8 @@ public record LoginResponse(
         String email,
         String name,
         String accessToken,
-        String tokenType
+        String tokenType,
+        String role
 ) {
 
     public static LoginResponse of(
@@ -19,7 +20,8 @@ public record LoginResponse(
                 user.getEmail(),
                 user.getName(),
                 accessToken,
-                "Bearer"
+                "Bearer",
+                user.getRole().name()
         );
     }
 }

@@ -1,7 +1,9 @@
 package com.example.babymungsoo.auth.service;
 
+import com.example.babymungsoo.auth.dto.request.EmailCheckRequest;
 import com.example.babymungsoo.auth.dto.request.LoginRequest;
 import com.example.babymungsoo.auth.dto.request.SignupRequest;
+import com.example.babymungsoo.auth.dto.response.EmailCheckResponse;
 import com.example.babymungsoo.auth.dto.response.LoginResponse;
 import com.example.babymungsoo.auth.dto.response.SignupResponse;
 import com.example.babymungsoo.global.exception.CustomException;
@@ -24,6 +26,21 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
+
+    // 회원가입 전 중복 확인용. 최종 중복 검사는 signup 에서 다시 한다.
+    public EmailCheckResponse checkEmail(
+            EmailCheckRequest request
+    ) {
+
+        String email =
+                request.email()
+                        .trim()
+                        .toLowerCase();
+
+        return new EmailCheckResponse(
+                !userRepository.existsByEmail(email)
+        );
+    }
 
     @Transactional
     public SignupResponse signup(
