@@ -1,6 +1,7 @@
 package com.example.babymungsoo.pet.dto.response;
 
 import com.example.babymungsoo.pet.entity.Pet;
+import java.time.LocalDate;
 import com.example.babymungsoo.pet.entity.PetGender;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
@@ -18,6 +19,9 @@ public record PetResponse(
 
         @Schema(description = "나이", example = "5")
         Integer age,
+
+        @Schema(description = "생년월일 (직접 나이 입력 시 null)")
+        LocalDate birthDate,
 
         @Schema(description = "성별", example = "MALE")
         PetGender gender,
@@ -47,6 +51,7 @@ public record PetResponse(
                 pet.getName(),
                 pet.getBreed(),
                 pet.getAge(),
+                pet.getBirthDate(),
                 pet.getGender(),
                 pet.getWeight(),
                 pet.isNeutered(),

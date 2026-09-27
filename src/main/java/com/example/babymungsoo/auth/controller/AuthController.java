@@ -1,7 +1,9 @@
 package com.example.babymungsoo.auth.controller;
 
+import com.example.babymungsoo.auth.dto.request.EmailCheckRequest;
 import com.example.babymungsoo.auth.dto.request.LoginRequest;
 import com.example.babymungsoo.auth.dto.request.SignupRequest;
+import com.example.babymungsoo.auth.dto.response.EmailCheckResponse;
 import com.example.babymungsoo.auth.dto.response.LoginResponse;
 import com.example.babymungsoo.auth.dto.response.SignupResponse;
 import com.example.babymungsoo.auth.service.AuthService;
@@ -26,6 +28,18 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final AuthService authService;
+
+    @Operation(
+            summary = "이메일 중복 확인"
+    )
+    @PostMapping("/email/check")
+    public EmailCheckResponse checkEmail(
+            @Valid
+            @RequestBody
+            EmailCheckRequest request
+    ) {
+        return authService.checkEmail(request);
+    }
 
     @Operation(
             summary = "이메일 회원가입"

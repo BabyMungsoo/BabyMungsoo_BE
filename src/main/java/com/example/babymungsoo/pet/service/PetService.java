@@ -16,6 +16,8 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.time.LocalDate;
+import java.time.Period;
 
 @Service
 @RequiredArgsConstructor
@@ -28,13 +30,23 @@ public class PetService {
 
     @Transactional
     public PetResponse createPet(PetCreateRequest request) {
+        if (request.age() == null && request.birthDate() == null) {
+            throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        int resolvedAge = request.birthDate() != null
+                ? Period.between(request.birthDate(), LocalDate.now()).getYears()
+                : request.age();
+
         User currentUser = findCurrentUser();
+
 
         Pet pet = Pet.builder()
                 .user(currentUser)
                 .name(request.name().trim())
                 .breed(request.breed().trim())
-                .age(request.age())
+                .age(resolvedAge)
+                .birthDate(request.birthDate())
                 .gender(request.gender())
                 .weight(request.weight())
                 .neutered(request.isNeutered())
@@ -85,6 +97,7 @@ public class PetService {
                 request.profileImage()
         );
 
+        pet.updateBirthDate(request.birthDate(), request.age());
         return PetResponse.from(pet);
     }
 
