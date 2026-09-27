@@ -1,23 +1,19 @@
 package com.example.babymungsoo.auth;
 
-import com.example.babymungsoo.auth.service.RecoveryMailService;
 import com.example.babymungsoo.user.entity.*;
 import com.example.babymungsoo.user.repository.UserRepository;
+import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -32,16 +28,17 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 })
 @AutoConfigureMockMvc
 class AccountRecoveryIntegrationTest {
+    private static final String NEW_PASSWORD = "newPassword1!";
+
     @Autowired MockMvc mvc;
     @Autowired UserRepository users;
     @Autowired PasswordEncoder encoder;
-    @MockitoBean RecoveryMailService mail;
 
     @BeforeEach
     void setUp() {
         users.deleteAll();
         users.save(User.builder().email("member@example.com").name("홍길동")
-                .phone("010-1234-5678").password(encoder.encode("oldPassword1"))
+                .phone("010-1234-5678").password(encoder.encode("oldPassword1!"))
                 .loginType(LoginType.EMAIL).role(UserRole.USER).build());
     }
 
@@ -56,21 +53,33 @@ class AccountRecoveryIntegrationTest {
     }
 
     @Test
-    void resetTokenIsHashedSingleUseAndChangesLoginPassword() throws Exception {
+    void emailAndNameMatchIssuesTokenThatChangesLoginPassword() throws Exception {
         String token = requestToken();
         User issued = users.findByEmail("member@example.com").orElseThrow();
         assertThat(issued.getPasswordResetHash()).hasSize(64).isNotEqualTo(token);
-        confirm(token, "newPassword1!", 204);
+        confirm(token, NEW_PASSWORD, 204);
         User updated = users.findByEmail("member@example.com").orElseThrow();
-        assertThat(encoder.matches("newPassword1!", updated.getPassword())).isTrue();
+        assertThat(encoder.matches(NEW_PASSWORD, updated.getPassword())).isTrue();
         assertThat(updated.getPasswordResetHash()).isNull();
         confirm(token, "anotherPassword1!", 400);
-        mvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"member@example.com\",\"password\":\"oldPassword1\"}"))
-                .andExpect(status().isUnauthorized());
-        mvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"member@example.com\",\"password\":\"newPassword1\"}"))
-                .andExpect(status().isOk());
+        login("oldPassword1!", 401);
+        login(NEW_PASSWORD, 200);
+    }
+
+    @Test
+    void mismatchedNameUnknownEmailAndSocialAccountsReturn404WithoutIssuingToken() throws Exception {
+        users.save(User.builder().email("social@example.com").name("소셜사용자")
+                .loginType(LoginType.GOOGLE).role(UserRole.USER).build());
+        request("member@example.com", "김철수").andExpect(status().isNotFound());
+        request("missing@example.com", "홍길동").andExpect(status().isNotFound());
+        request("social@example.com", "소셜사용자").andExpect(status().isNotFound());
+        assertThat(users.findByEmail("member@example.com").orElseThrow().getPasswordResetHash()).isNull();
+    }
+
+    @Test
+    void emailIsCaseInsensitiveAndNameIsTrimmed() throws Exception {
+        request("Member@Example.com", "  홍길동 ").andExpect(status().isOk())
+                .andExpect(jsonPath("$.resetToken").isString());
     }
 
     @Test
@@ -82,7 +91,7 @@ class AccountRecoveryIntegrationTest {
                 start.await();
                 return mvc.perform(post("/api/v1/auth/password-reset/confirm")
                                 .contentType(MediaType.APPLICATION_JSON)
-                                .content("{\"token\":\"" + token + "\",\"newPassword\":\"newPassword1\"}"))
+                                .content("{\"token\":\"" + token + "\",\"newPassword\":\"" + NEW_PASSWORD + "\"}"))
                         .andReturn().getResponse().getStatus();
             };
             var first = executor.submit(confirm);
@@ -94,84 +103,54 @@ class AccountRecoveryIntegrationTest {
     }
 
     @Test
-    void unknownAccountAndCooldownReturnSameStatusWithoutSendingMail() throws Exception {
-        requestToken();
-        request("member@example.com");
-        request("missing@example.com");
-        verify(mail, times(1)).sendResetToken(anyString(), anyString());
-    }
-
-    @Test
     void expiredAndInvalidTokensCannotChangePassword() throws Exception {
         String token = requestToken();
         User user = users.findByEmail("member@example.com").orElseThrow();
         user.issuePasswordReset(user.getPasswordResetHash(), Instant.now().minusSeconds(901));
         users.save(user);
-        confirm(token, "newPassword1", 400);
-        confirm("x".repeat(43), "newPassword1", 400);
-        assertThat(encoder.matches("oldPassword1", users.findById(user.getId()).orElseThrow().getPassword())).isTrue();
+        confirm(token, NEW_PASSWORD, 400);
+        confirm("x".repeat(43), NEW_PASSWORD, 400);
+        assertThat(encoder.matches("oldPassword1!", users.findById(user.getId()).orElseThrow().getPassword())).isTrue();
     }
 
     @Test
-    void resendingInvalidatesPreviousToken() throws Exception {
+    void reissuingInvalidatesPreviousToken() throws Exception {
         String first = requestToken();
-        User user = users.findByEmail("member@example.com").orElseThrow();
-        user.issuePasswordReset(user.getPasswordResetHash(), Instant.now().minusSeconds(61));
-        users.save(user);
-        clearInvocations(mail);
         String second = requestToken();
-        confirm(first, "newPassword1", 400);
-        confirm(second, "newPassword1", 204);
-    }
-
-    @Test
-    void socialAccountsCannotUseEmailRecovery() throws Exception {
-        users.save(User.builder().email("social@example.com").name("소셜사용자")
-                .phone("01012345678").loginType(LoginType.GOOGLE).role(UserRole.USER).build());
-        request("social@example.com");
-        verify(mail, never()).sendResetToken(anyString(), anyString());
-        mvc.perform(post("/api/v1/auth/find-id").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"name\":\"소셜사용자\",\"phone\":\"01012345678\"}"))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.maskedEmails").isEmpty());
-    }
-
-    @Test
-    void mailFailureRollsBackTokenIssuance() throws Exception {
-        doThrow(new com.example.babymungsoo.global.exception.CustomException(
-                com.example.babymungsoo.global.exception.ErrorCode.RECOVERY_MAIL_UNAVAILABLE))
-                .when(mail).sendResetToken(anyString(), anyString());
-        mvc.perform(post("/api/v1/auth/password-reset/request").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"member@example.com\"}"))
-                .andExpect(status().isServiceUnavailable());
-        assertThat(users.findByEmail("member@example.com").orElseThrow().getPasswordResetHash()).isNull();
+        confirm(first, NEW_PASSWORD, 400);
+        confirm(second, NEW_PASSWORD, 204);
     }
 
     @Test
     void rejectsInvalidInputAndOversizedUtf8Passwords() throws Exception {
-        mvc.perform(post("/api/v1/auth/password-reset/request").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"invalid\"}"))
-                .andExpect(status().isBadRequest());
+        request("invalid", "홍길동").andExpect(status().isBadRequest());
+        request("member@example.com", " ").andExpect(status().isBadRequest());
         String token = requestToken();
         confirm(token, "short", 400);
-        confirm(token, "가".repeat(25), 400);
+        confirm(token, "noSpecial123", 400);
+        confirm(token, "가".repeat(25) + "a1!", 400);
     }
 
-    private void request(String email) throws Exception {
-        mvc.perform(post("/api/v1/auth/password-reset/request").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"" + email + "\"}"))
-                .andExpect(status().isAccepted());
+    private org.springframework.test.web.servlet.ResultActions request(String email, String name) throws Exception {
+        return mvc.perform(post("/api/v1/auth/password-reset/request").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"" + email + "\",\"name\":\"" + name + "\"}"));
     }
 
     private String requestToken() throws Exception {
-        request("member@example.com");
-        ArgumentCaptor<String> token = ArgumentCaptor.forClass(String.class);
-        verify(mail).sendResetToken(eq("member@example.com"), token.capture());
-        return token.getValue();
+        String body = request("member@example.com", "홍길동").andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
+        return JsonPath.read(body, "$.resetToken");
     }
 
     private void confirm(String token, String password, int statusCode) throws Exception {
         mvc.perform(post("/api/v1/auth/password-reset/confirm").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"token\":\"" + token + "\",\"newPassword\":\"" + password + "\"}"))
+                .andExpect(status().is(statusCode));
+    }
+
+    private void login(String password, int statusCode) throws Exception {
+        mvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"member@example.com\",\"password\":\"" + password + "\"}"))
                 .andExpect(status().is(statusCode));
     }
 }

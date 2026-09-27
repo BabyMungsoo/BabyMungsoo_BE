@@ -2,6 +2,7 @@ package com.example.babymungsoo.auth.service;
 
 import com.example.babymungsoo.auth.dto.request.*;
 import com.example.babymungsoo.auth.dto.response.FindIdResponse;
+import com.example.babymungsoo.auth.dto.response.PasswordResetTokenResponse;
 import com.example.babymungsoo.global.exception.CustomException;
 import com.example.babymungsoo.global.exception.ErrorCode;
 import com.example.babymungsoo.user.entity.LoginType;
@@ -27,7 +28,6 @@ import java.util.Locale;
 public class AccountRecoveryService {
     private final UserRepository users;
     private final PasswordEncoder passwordEncoder;
-    private final RecoveryMailService mail;
     private static final SecureRandom RANDOM = new SecureRandom();
 
     public FindIdResponse findId(FindIdRequest request) {
@@ -40,24 +40,21 @@ public class AccountRecoveryService {
                 .map(user -> maskEmail(user.getEmail())).distinct().sorted().toList());
     }
 
+    /**
+     * 개발 단계용: 메일 인증 없이 이메일·이름이 일치하면 재설정 토큰을 바로 돌려준다.
+     * 새로 발급하면 이전 토큰은 무효가 된다.
+     */
     @Transactional
-    public void requestReset(PasswordResetRequest request) {
-        // Check configuration independently of account existence.
-        mail.checkAvailable();
-        User user = users.findByEmailForUpdate(request.email().trim().toLowerCase(Locale.ROOT)).orElse(null);
-        if (user == null || user.getLoginType() != LoginType.EMAIL) {
-            return;
-        }
-        Instant now = Instant.now();
-        if (user.getPasswordResetRequestedAt() != null
-                && now.isBefore(user.getPasswordResetRequestedAt().plusSeconds(60))) {
-            return;
-        }
+    public PasswordResetTokenResponse requestReset(PasswordResetRequest request) {
+        User user = users.findByEmailForUpdate(request.email().trim().toLowerCase(Locale.ROOT))
+                .filter(found -> found.getLoginType() == LoginType.EMAIL)
+                .filter(found -> found.getName().equals(request.name().trim()))
+                .orElseThrow(() -> new CustomException(ErrorCode.RECOVERY_ACCOUNT_NOT_FOUND));
         byte[] bytes = new byte[32];
         RANDOM.nextBytes(bytes);
         String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-        user.issuePasswordReset(hash(token), now);
-        mail.sendResetToken(user.getEmail(), token);
+        user.issuePasswordReset(hash(token), Instant.now());
+        return new PasswordResetTokenResponse(token);
     }
 
     @Transactional

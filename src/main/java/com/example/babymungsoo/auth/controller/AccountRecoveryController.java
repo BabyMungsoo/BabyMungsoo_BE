@@ -2,6 +2,7 @@ package com.example.babymungsoo.auth.controller;
 
 import com.example.babymungsoo.auth.dto.request.*;
 import com.example.babymungsoo.auth.dto.response.FindIdResponse;
+import com.example.babymungsoo.auth.dto.response.PasswordResetTokenResponse;
 import com.example.babymungsoo.auth.service.AccountRecoveryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -10,7 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
-@Tag(name = "계정 복구", description = "아이디 찾기 및 이메일 인증을 통한 비밀번호 재설정")
+@Tag(name = "계정 복구", description = "아이디 찾기 및 이메일·이름 확인을 통한 비밀번호 재설정")
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/auth")
@@ -23,11 +24,11 @@ public class AccountRecoveryController {
         return recovery.findId(request);
     }
 
-    @Operation(summary = "비밀번호 재설정 메일 요청", description = "가입 여부와 관계없이 202 응답. 토큰은 15분간 유효하며 재발송 간격은 60초입니다.")
+    @Operation(summary = "이메일·이름 확인 후 재설정 토큰 발급",
+            description = "메일 인증 없이 이메일과 이름이 일치하면 토큰을 바로 반환합니다. 불일치 시 404. 토큰은 15분간 한 번만 유효합니다.")
     @PostMapping("/password-reset/request")
-    @ResponseStatus(HttpStatus.ACCEPTED)
-    public void requestReset(@Valid @RequestBody PasswordResetRequest request) {
-        recovery.requestReset(request);
+    public PasswordResetTokenResponse requestReset(@Valid @RequestBody PasswordResetRequest request) {
+        return recovery.requestReset(request);
     }
 
     @Operation(summary = "일회용 토큰으로 비밀번호 재설정")
