@@ -79,6 +79,48 @@ public class KakaoLocalClient {
         return collected;
     }
 
+    /**
+     * 상호명(키워드)으로 동물병원 한 곳을 찾는다. 큐레이션 목록(24시간 병원 등)의
+     * 좌표·주소·장소 ID 를 확정하는 데 쓴다.
+     *
+     * <p>반경 검색과 달리 좌표를 주지 않으므로 전국에서 이름이 같은 곳이 섞여 온다.
+     * 그래서 결과를 그대로 쓰지 않고 호출부가 주소(구 이름 등)로 한 번 더 걸러야 한다.
+     *
+     * @param keyword 검색어. 지점명이 붙어 있으면 그대로 넣는 편이 정확하다 (예: "VIP동물의료센터 청담점")
+     * @return 카테고리가 동물병원인 결과, 정확도순 (최대 {@value #PAGE_SIZE}건)
+     */
+    public List<KakaoKeywordResponse.Document> searchByName(String keyword) {
+        if (!StringUtils.hasText(apiKey)) {
+            throw new CustomException(ErrorCode.KAKAO_API_KEY_NOT_CONFIGURED);
+        }
+
+        KakaoKeywordResponse response;
+        try {
+            response = restClient.get()
+                    .uri(uriBuilder -> uriBuilder
+                            .path(KEYWORD_PATH)
+                            .queryParam("query", keyword)
+                            .queryParam("size", PAGE_SIZE)
+                            .queryParam("sort", "accuracy")
+                            .build())
+                    .header("Authorization", "KakaoAK " + apiKey)
+                    .retrieve()
+                    .body(KakaoKeywordResponse.class);
+        } catch (CustomException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new CustomException(ErrorCode.KAKAO_API_ERROR);
+        }
+
+        if (response == null || response.documents() == null) {
+            return List.of();
+        }
+
+        return response.documents().stream()
+                .filter(doc -> doc.categoryName() != null && doc.categoryName().contains("동물병원"))
+                .toList();
+    }
+
     private KakaoKeywordResponse requestPage(double latitude, double longitude,
                                              int radius, int page) {
         try {

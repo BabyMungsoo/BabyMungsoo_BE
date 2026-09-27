@@ -18,6 +18,7 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Getter
 @Entity
@@ -31,6 +32,9 @@ public class MediaFile {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(nullable = false, unique = true, updatable = false)
+    private UUID publicId;
 
     @Column(nullable = false)
     private Long userId;
@@ -50,6 +54,7 @@ public class MediaFile {
      * 문진 세션을 생성할 때 함께 연결된다(TriageService#createSession).
      */
     private Long sessionId;
+
 
     @CreatedDate
     @Column(updatable = false)

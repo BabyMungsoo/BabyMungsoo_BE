@@ -18,7 +18,9 @@ public class TriageQuestionInitializer implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
-        if (questionRepository.count() > 0) {
+        // count() 를 쓰면 세션별 AI 생성 질문이 쌓인 뒤로는 항상 0보다 커져,
+        // 새 DB에서도 마스터 시드가 돌지 않는다. 마스터만 세어 판단한다.
+        if (questionRepository.countBySessionIdIsNull() > 0) {
             return;
         }
 

@@ -27,13 +27,18 @@ public class StubTriageAnalyzer implements TriageAnalyzer {
     public ClaudeTriageResult analyze(String rawSymptoms, PetProfile pet, List<TriageImage> images) {
         return new ClaudeTriageResult(
                 TriageLevel.WATCH,
-                "[MOCK] 경과 관찰이 필요한 상태입니다",
                 List.of(
-                        "[MOCK] 증상이 반복적으로 나타나고 있어 악화 가능성이 있습니다.",
-                        "[MOCK] 의식 저하나 출혈 등 즉시 내원이 필요한 징후는 확인되지 않았습니다."
+                        "[MOCK] 증상이 반복적으로 나타남",
+                        "[MOCK] 물과 사료는 평소처럼 먹음",
+                        "[MOCK] 기력은 평소와 비슷함"
                 ),
-                "[MOCK] 물과 사료를 소량씩 나누어 주고 12시간 동안 상태를 지켜보세요. "
-                        + "증상이 심해지거나 새로운 증상이 나타나면 즉시 동물병원에 방문하세요."
+                "[MOCK] 전신 상태는 안정적으로 확인되지만 증상이 반복되고 있어 가까운 시일 내 진료가 필요합니다.",
+                List.of(
+                        "[MOCK] 증상 횟수가 늘어남",
+                        "[MOCK] 물을 마시지 않음",
+                        "[MOCK] 축 늘어져 일어나지 못함"
+                ),
+                List.of("[MOCK] 이동 전까지 사료는 치워 두세요")
         );
     }
 }

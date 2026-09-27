@@ -8,10 +8,12 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 @Repository
 public interface MediaFileRepository extends JpaRepository<MediaFile, Long> {
     Optional<MediaFile> findByIdAndUserId(Long id, Long userId);
+    Optional<MediaFile> findByPublicId(UUID publicId);
 
     // 같은 미디어에 대한 동시 분석 요청을 직렬화해, MediaAnalysis 중복 생성(유니크 제약 위반)을 막기 위한 잠금 조회
     @Lock(LockModeType.PESSIMISTIC_WRITE)

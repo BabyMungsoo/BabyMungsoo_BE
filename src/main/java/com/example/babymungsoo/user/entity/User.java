@@ -72,4 +72,10 @@ public class User {
         this.passwordResetHash = null;
         this.passwordResetExpiresAt = null;
     }
+
+    public void changePassword(
+            String encodedPassword
+    ) {
+        this.password = encodedPassword;
+    }
 }

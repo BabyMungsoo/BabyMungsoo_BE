@@ -33,6 +33,24 @@ public class HospitalController {
         return ResponseEntity.ok(hospital);
     }
 
+    /**
+     * 거리 제한 없이 가까운 순 N곳. 결과 화면의 '가까운 동물병원' 목록이 쓴다.
+     * recommend 는 5km 박스라 교외에서 비는데, 여기는 늘 무언가 돌려준다.
+     */
+    @GetMapping("/nearest")
+    public ResponseEntity<List<HospitalResponseDto>> nearestHospitals(
+            @RequestParam Double lat,
+            @RequestParam Double lng,
+            @RequestParam String level,
+            @RequestParam(defaultValue = "3") int limit) {
+        List<HospitalResponseDto> hospitals = hospitalService
+                .nearestHospitals(lat, lng, level, limit)
+                .stream()
+                .map(HospitalResponseDto::from)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(hospitals);
+    }
+
     @GetMapping("/recommend")
     public ResponseEntity<List<HospitalResponseDto>> recommendHospitals(
             @RequestParam Double lat,

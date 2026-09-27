@@ -12,10 +12,6 @@ import java.util.List;
 @Getter
 public class AnalysisRecordCreateRequestDto {
 
-    @NotNull(message = "userId는 필수입니다.")
-    @Positive(message = "userId는 양수여야 합니다.")
-    private Long userId;
-
     @NotNull(message = "dogId는 필수입니다.")
     @Positive(message = "dogId는 양수여야 합니다.")
     private Long dogId;
@@ -38,8 +34,8 @@ public class AnalysisRecordCreateRequestDto {
     private List<Long> mediaIds;
 
     public AnalysisRecord toEntity() {
+        // userId 는 넣지 않는다. 주인은 서비스가 토큰에서 채운다(assignOwner).
         AnalysisRecord.AnalysisRecordBuilder builder = AnalysisRecord.builder()
-                .userId(userId)
                 .dogId(dogId)
                 .symptomText(symptomText)
                 .aiResult(aiResult)

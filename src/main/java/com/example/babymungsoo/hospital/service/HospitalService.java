@@ -6,6 +6,7 @@ import com.example.babymungsoo.global.exception.ErrorCode;
 import com.example.babymungsoo.hospital.entity.Hospital;
 import com.example.babymungsoo.hospital.repository.HospitalRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -49,6 +50,30 @@ public class HospitalService {
         return hospitalRepository.findHospitalsByLocation(
                 minLat, maxLat, minLng, maxLng
         );
+    }
+
+    /** 결과 화면에 한 번에 보여줄 상한. 그 이상은 지도(9번)에서 본다. */
+    private static final int MAX_NEAREST = 20;
+
+    /**
+     * 거리 제한 없이 가까운 순으로 limit 곳. 결과 화면(4번)의 '가까운 동물병원' 목록용.
+     *
+     * <p>recommend 와 달리 반경 박스가 없어 교외에서도 늘 무언가 돌려준다.
+     * IMMEDIATE 는 24시간 병원만 가까운 순으로 주되, 그런 병원이 하나도 없으면(데이터 미비)
+     * 빈 목록 대신 전체에서 가까운 순으로 준다 — 응급 상황에 빈 화면은 곤란하다.
+     */
+    public List<Hospital> nearestHospitals(Double lat, Double lng, String level, int limit) {
+        validateCoordinate(lat, lng);
+        TriageLevel emergencyLevel = parseLevel(level);
+        PageRequest page = PageRequest.of(0, Math.max(1, Math.min(limit, MAX_NEAREST)));
+
+        if (emergencyLevel == TriageLevel.IMMEDIATE) {
+            List<Hospital> open24h = hospitalRepository.findNearest(lat, lng, true, page);
+            if (!open24h.isEmpty()) {
+                return open24h;
+            }
+        }
+        return hospitalRepository.findNearest(lat, lng, false, page);
     }
 
     private void validateCoordinate(Double lat, Double lng) {
