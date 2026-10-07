@@ -70,13 +70,12 @@ public class AnalysisRecord {
         this.userId = userId;
     }
 
-    public void update(String symptomText, String emergencyLevel, String suspectedDisease) {
+    /**
+     * 보호자가 고칠 수 있는 값만 반영한다. 응급도·의심질환은 AI 가 판단한 값이라 건드리지 않는다.
+     */
+    public void update(String symptomText) {
         if (symptomText != null && !symptomText.isBlank()) {
             this.symptomText = symptomText;
         }
-        if (emergencyLevel != null && !emergencyLevel.isBlank()) {
-            this.emergencyLevel = emergencyLevel;
-        }
-        this.suspectedDisease = suspectedDisease;
     }
 }
