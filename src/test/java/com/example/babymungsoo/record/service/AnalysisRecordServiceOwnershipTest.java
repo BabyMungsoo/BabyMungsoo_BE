@@ -15,6 +15,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Optional;
 
@@ -71,6 +72,24 @@ class AnalysisRecordServiceOwnershipTest {
         when(analysisRecordRepository.findById(3L)).thenReturn(Optional.of(mine));
 
         assertThat(service.getRecordById(3L)).isSameAs(mine);
+    }
+
+    @Test
+    @DisplayName("수정은 증상만 반영하고 AI 판단값(응급도·의심질환)은 건드리지 않는다")
+    void updateOnlyChangesSymptomText() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(ME);
+        AnalysisRecord mine = record(3L, ME);
+        when(analysisRecordRepository.findById(3L)).thenReturn(Optional.of(mine));
+
+        AnalysisRecordUpdateRequestDto request = new AnalysisRecordUpdateRequestDto();
+        ReflectionTestUtils.setField(request, "symptomText", "구토가 멎었어요");
+
+        service.updateRecord(3L, request);
+
+        assertThat(mine.getSymptomText()).isEqualTo("구토가 멎었어요");
+        // AI 가 판단한 값은 그대로여야 한다 — 보호자가 바꾸면 기록의 신뢰성이 깨진다
+        assertThat(mine.getEmergencyLevel()).isEqualTo("WATCH");
+        assertThat(mine.getSuspectedDisease()).isNull();
     }
 
     @Test
