@@ -55,7 +55,10 @@ public class SecurityConfig {
                                         "/api/v1/media/public/**",
                                         "/swagger-ui/**",
                                         "/swagger-ui.html",
-                                        "/api-docs/**"
+                                        "/api-docs/**",
+                                        // 배포 스크립트가 토큰 없이 새 컨테이너 상태를 확인한다.
+                                        // 상태(UP/DOWN)만 내려가고 세부 정보는 숨긴다(application.yml)
+                                        "/actuator/health"
                                 )
                                 .permitAll()
 

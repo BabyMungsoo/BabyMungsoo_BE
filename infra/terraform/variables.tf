@@ -34,9 +34,9 @@ variable "git_repo" {
 }
 
 variable "git_ref" {
-  description = "배포할 브랜치. 최초 부팅 때 사용하며, 이후에는 deploy.sh 인자로 바꿀 수 있다"
+  description = "최초 부팅 때 서버에서 빌드할 브랜치. 이후 배포는 main push 시 GitHub Actions(cd.yml)가 한다"
   type        = string
-  default     = "develop"
+  default     = "main"
 }
 
 variable "ssh_allowed_cidrs" {
