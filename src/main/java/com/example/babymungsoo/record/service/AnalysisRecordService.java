@@ -52,11 +52,7 @@ public class AnalysisRecordService {
         AnalysisRecord record = requireOwned(analysisRecordRepository.findById(recordId)
                 .orElseThrow(() -> new CustomException(ErrorCode.RECORD_NOT_FOUND)));
 
-        record.update(
-                requestDto.getSymptomText(),
-                requestDto.getEmergencyLevel(),
-                requestDto.getSuspectedDisease()
-        );
+        record.update(requestDto.getSymptomText());
         return record;
     }
 

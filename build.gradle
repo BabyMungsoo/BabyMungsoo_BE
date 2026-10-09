@@ -26,6 +26,8 @@ dependencies {
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.3'
     developmentOnly 'org.springframework.boot:spring-boot-devtools'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
+    // 무중단 배포에서 새 컨테이너가 요청을 받을 준비가 됐는지 /actuator/health 로 확인한다
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
 
     // Claude API 연동
     //
