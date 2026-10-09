@@ -1,0 +1,53 @@
+jwt:
+  secret: ${JWT_SECRET}
+  access-token-expiration-ms: ${JWT_ACCESS_TOKEN_EXPIRATION_MS:3600000}
+
+cors:
+  # 쉼표로 구분한 출처 패턴. 배포 시 프론트 도메인으로 덮어쓴다.
+  allowed-origin-patterns: ${CORS_ALLOWED_ORIGIN_PATTERNS:http://localhost:*,http://127.0.0.1:*}
+
+admin:
+  email: ${ADMIN_EMAIL:}
+  password: ${ADMIN_PASSWORD:}
+  name: ${ADMIN_NAME:관리자}
+
+claude:
+  api:
+    # 실제 키는 CLAUDE_API_KEY 환경변수로 주입한다. 설정 파일에 평문으로 저장하지 않는다.
+    # 기본값을 비워 두어 키 미설정을 AI_API_KEY_NOT_CONFIGURED로 정확히 감지한다.
+    key: ${CLAUDE_API_KEY:}
+    model: claude-sonnet-5
+    # 추가 문진 질문 생성용 모델. 기본값은 분석 모델과 같다.
+    # 질문 생성은 응급도 판정을 하지 않아 더 가벼운 모델로 낮출 여지가 있는데,
+    # 한국어 질문 품질을 실호출로 확인한 뒤 바꾸기 위해 설정만 분리해 둔다.
+    question-model: ${CLAUDE_QUESTION_MODEL:claude-sonnet-5}
+    # true면 StubTriageAnalyzer(실호출·과금 없음), false면 ClaudeTriageAnalyzer.
+    # 구현체는 @ConditionalOnProperty로 전환하며 matchIfMissing을 쓰지 않으므로,
+    # 이 속성이 없으면 두 빈이 모두 등록되지 않아 기동에 실패한다. 반드시 유지할 것.
+    # 기본값 true로 개발 중 의도치 않은 과금을 막고, 운영은 prod 설정에서 false로 고정한다.
+    mock: ${CLAUDE_API_MOCK:true}
+
+kakao:
+  # 카카오 로컬(장소검색) REST API 키. 서버 비밀값이므로 KAKAO_REST_API_KEY 환경변수로 주입한다.
+  # 비어 있으면 시드 호출 시 KAKAO_API_KEY_NOT_CONFIGURED로 감지된다.
+  rest-api-key: ${KAKAO_REST_API_KEY:}
+
+spring:
+  config:
+    import: optional:file:.env[.properties]
+
+  main:
+    allow-bean-definition-overriding: true
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE}
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 20MB
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+  api-docs:
+    path: /api-docs
