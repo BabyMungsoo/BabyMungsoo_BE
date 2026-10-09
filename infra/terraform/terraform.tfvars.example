@@ -1,0 +1,19 @@
+# terraform.tfvars 로 복사해서 값을 채운다. terraform.tfvars 는 커밋하지 않는다.
+
+# Vercel 프로젝트 주소에 맞게. 프리뷰 배포까지 허용하려면 와일드카드로.
+cors_allowed_origin_patterns = "https://babymungsoo*.vercel.app,http://localhost:*"
+
+claude_api_key     = "sk-ant-..."
+kakao_rest_api_key = "..."
+
+admin_email    = "admin@example.com"
+admin_password = "..."
+
+# 지원 계정의 ControlOnlyOwnResources 정책이 요구하는 소유자 태그.
+# 이 태그가 없으면 만든 리소스를 수정·삭제(terraform apply / destroy)할 수 없다.
+owner_tags = {
+  # "<키>" = "<값>"
+}
+
+# 기능 브랜치를 먼저 띄워 보려면
+# git_ref = "feat/seulgi_terraform"
